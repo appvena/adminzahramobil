@@ -3,7 +3,6 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { db, auth } from "./firebase";
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // ─── MOCK DATA ───────────────────────────────────────────────────────────────
 const INSPECTION_CATEGORIES = [
@@ -18,6 +17,9 @@ function defaultInspection() {
   INSPECTION_CATEGORIES.forEach(cat => { out[cat.key] = cat.items.map(name => ({ name, status: "OK", note: "" })); });
   return out;
 }
+
+const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
+const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 
 const STAGES = ["Pesanan Baru", "Verifikasi Data", "Proses Leasing/Pelunasan", "Penyiapan Towing", "Mobil Terkirim"];
 const STAGE_SHORT = { "Pesanan Baru": "Baru", "Verifikasi Data": "Verifikasi", "Proses Leasing/Pelunasan": "Leasing/Lunas", "Penyiapan Towing": "Towing", "Mobil Terkirim": "Terkirim" };
@@ -259,16 +261,20 @@ function InventarisView({ cars, setCars }) {
     const files = Array.from(fileList).filter(f => f.type.startsWith("image/"));
     if (files.length === 0) return;
     setUploadingCount(c => c + files.length);
-    const storage = getStorage();
     for (const file of files) {
       try {
-        const path = `cars/${Date.now()}_${file.name}`;
-        const storageRef = ref(storage, path);
-        await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(storageRef);
-        setForm(prev => ({ ...prev, images: [...prev.images, url] }));
+        const data = new FormData();
+        data.append("file", file);
+        data.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+          method: "POST",
+          body: data,
+        });
+        const json = await res.json();
+        if (!json.secure_url) throw new Error(json.error?.message || "Upload gagal");
+        setForm(prev => ({ ...prev, images: [...prev.images, json.secure_url] }));
       } catch (e) {
-        alert(`Gagal mengunggah foto "${file.name}". Silakan coba lagi.`);
+        alert(`Gagal mengunggah foto "${file.name}": ${e.message}`);
       } finally {
         setUploadingCount(c => c - 1);
       }
