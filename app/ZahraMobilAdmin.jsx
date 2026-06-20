@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 
@@ -69,10 +69,10 @@ const NAV = [
 
 function Sidebar({ active, setActive, onLogout }) {
   return (
-    <aside style={{ width: 220, background: "linear-gradient(180deg, #2A6EBB 0%, #1B4F91 100%)", borderRight: "2px solid #0A3E9E", display: "flex", flexDirection: "column", minHeight: "100vh", position: "fixed", top: 0, left: 0, zIndex: 100, fontFamily: xpFont }}>
+    <aside className="zm-sidebar" style={{ width: 220, background: "linear-gradient(180deg, #2A6EBB 0%, #1B4F91 100%)", borderRight: "2px solid #0A3E9E", display: "flex", flexDirection: "column", minHeight: "100vh", position: "fixed", top: 0, left: 0, zIndex: 100, fontFamily: xpFont, overflow: "hidden" }}>
       <div style={{ ...xpTitlebar, borderRadius: 0, padding: "8px 12px" }}>
-        <div style={{ width: 22, height: 22, background: T.gold, border: "1px solid #8a6d1f", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#000", fontSize: 12 }}>Z</div>
-        <div style={{ lineHeight: 1.2 }}><div style={{ fontSize: 13 }}>ZAHRA MOBIL</div><div style={{ fontSize: 9, opacity: 0.85, fontWeight: 400 }}>ADMIN PANEL</div></div>
+        <div style={{ width: 22, height: 22, background: T.gold, border: "1px solid #8a6d1f", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#000", fontSize: 12, flexShrink: 0 }}>Z</div>
+        <div className="zm-sidebar-label" style={{ lineHeight: 1.2 }}><div style={{ fontSize: 13 }}>ZAHRA MOBIL</div><div style={{ fontSize: 9, opacity: 0.85, fontWeight: 400 }}>ADMIN PANEL</div></div>
       </div>
       <nav style={{ padding: 10, flex: 1 }}>
         {NAV.map(n => (
@@ -81,19 +81,19 @@ function Sidebar({ active, setActive, onLogout }) {
             cursor: "pointer", marginBottom: 3, background: active === n.key ? "rgba(255,255,255,0.25)" : "transparent",
             color: "#fff", fontWeight: active === n.key ? 700 : 400, fontSize: 12.5, textAlign: "left", fontFamily: xpFont, borderRadius: 3,
           }}>
-            <span style={{ fontSize: 16 }}>{n.icon}</span> {n.label}
+            <span style={{ fontSize: 16, flexShrink: 0 }}>{n.icon}</span> <span className="zm-sidebar-label">{n.label}</span>
           </button>
         ))}
       </nav>
       <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.3)", background: "rgba(0,0,0,0.1)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <div style={{ width: 28, height: 28, background: "#fff", border: "1px solid #0A3E9E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>👤</div>
+        <div className="zm-sidebar-label" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <div style={{ width: 28, height: 28, background: "#fff", border: "1px solid #0A3E9E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>👤</div>
           <div><div style={{ color: "#fff", fontSize: 11.5, fontWeight: 700 }}>Admin</div><div style={{ color: "#cfe0f7", fontSize: 10 }}>Super Admin</div></div>
         </div>
         <button onClick={onLogout} style={{ width: "100%", padding: "5px", ...xpBtn(false), fontSize: 11.5, cursor: "pointer" }}>
-          Keluar
+          <span className="zm-sidebar-label">Keluar</span>
         </button>
-        <div style={{ textAlign: "center", marginTop: 10, color: "#aecbed", fontSize: 9.5 }}>
+        <div className="zm-sidebar-label" style={{ textAlign: "center", marginTop: 10, color: "#aecbed", fontSize: 9.5 }}>
           v{APP_VERSION} · ©2026 SRISP
         </div>
       </div>
@@ -146,14 +146,14 @@ function DashboardView({ cars, orders, transactions }) {
 
   return (
     <div style={{ padding: 28 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+      <div className="zm-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
         <StatCard icon="🚗" label="Unit Ready" value={totalStok} sub="Siap jual" color={T.green} />
         <StatCard icon="📋" label="Unit Booking" value={totalBooking} sub="Dalam proses" color={T.amber} />
         <StatCard icon="✅" label="Terjual" value={totalTerjual} sub="Total" color={T.accent} />
         <StatCard icon="🔔" label="Pesanan Baru" value={orderBaru} sub="Perlu ditindak" color="#a855f7" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 20, marginBottom: 24 }}>
+      <div className="zm-dash-grid" style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 20, marginBottom: 24 }}>
         <div style={{ ...card, padding: "24px 28px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
             <div>
@@ -397,14 +397,14 @@ function InventarisView({ cars, setCars }) {
 
             {/* Identitas kendaraan */}
             <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10, fontWeight: 700 }}>Identitas Kendaraan</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
+            <div className="zm-form-grid2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
               {[["brand", "Merek *", "Toyota"], ["model", "Model *", "Fortuner GR Sport"], ["noRangka", "No. Rangka", "MHFXX1234K567890"], ["noMesin", "No. Mesin", "2GD-FTV-88321"], ["color", "Warna", "Hitam Metalik"], ["year", "Tahun", "2024"], ["km", "Kilometer", "8200"]].map(([key, label, ph]) => (
                 <div key={key}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
                   <input style={inp} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={ph} /></div>
               ))}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 18 }}>
+            <div className="zm-form-grid3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 18 }}>
               {[["type", "Tipe", ["SUV", "MPV", "Sedan", "Hatchback", "Pickup"]], ["transmission", "Transmisi", ["Otomatis", "Manual"]], ["fuel", "Bahan Bakar", ["Bensin", "Diesel", "Hybrid", "Listrik"]]].map(([key, label, opts]) => (
                 <div key={key}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
                   <select style={inp} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}>{opts.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
@@ -413,7 +413,7 @@ function InventarisView({ cars, setCars }) {
 
             {/* Harga */}
             <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10, fontWeight: 700 }}>Harga</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 18 }}>
+            <div className="zm-form-grid3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 18 }}>
               <div><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Harga Beli (Rp)</label>
                 <input style={inp} value={form.priceBeli} onChange={e => setForm(f => ({ ...f, priceBeli: e.target.value }))} placeholder="540000000" /></div>
               <div><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Harga Jual (Rp) *</label>
@@ -534,6 +534,9 @@ function CRMView({ orders, setOrders }) {
                     <div style={{ color: T.muted, fontSize: 11, marginBottom: 6 }}>📱 {o.phone}</div>
                     <div style={{ color, fontSize: 11, fontWeight: 600, marginBottom: 4 }}>🚗 {o.unit}</div>
                     <div style={{ color: T.muted, fontSize: 10.5, marginBottom: 8 }}>📍 {o.alamat}</div>
+                    {o.ktp && (
+                      <a href={o.ktp} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginBottom: 8, fontSize: 10.5, color: T.accent, textDecoration: "underline" }}>🪪 Lihat Foto KTP</a>
+                    )}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ background: `${color}22`, color, padding: "2px 6px", borderRadius: 4, fontSize: 10 }}>{o.metode}</span>
                       <span style={{ color: T.muted, fontSize: 10 }}>{o.time}</span>
@@ -581,14 +584,14 @@ function FinanceView({ transactions, setTransactions, cars }) {
 
   return (
     <div style={{ padding: 28 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+      <div className="zm-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
         <StatCard icon="📈" label="Total Pemasukan" value={fmtShort(pemasukan)} sub="Bulan ini" color={T.green} />
         <StatCard icon="📉" label="Total Pengeluaran" value={fmtShort(pengeluaran)} sub="Bulan ini" color={T.red} />
         <StatCard icon="💎" label="Laba Bersih" value={fmtShort(laba)} sub={laba >= 0 ? "Surplus ✓" : "Defisit !"} color={laba >= 0 ? T.green : T.red} />
         <StatCard icon="🏆" label="Profit per Unit" value={fmtShort(totalProfitUnit)} sub={`${soldCars.length} unit terjual`} color={T.gold} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 20, marginBottom: 24 }}>
+      <div className="zm-fin-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 20, marginBottom: 24 }}>
         <div style={{ ...card, padding: 24 }}>
           <div style={{ color: T.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 20 }}>Input Transaksi</div>
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -758,11 +761,30 @@ export default function ZahraMobilAdmin() {
   }
 
   return (
-    <div style={{ background: T.bg, minHeight: "100vh", fontFamily: xpFont, display: "flex" }}>
+    <div style={{ background: T.bg, minHeight: "100vh", fontFamily: xpFont, display: "flex", overflowX: "hidden", maxWidth: "100vw" }}>
+      <style>{`
+        * { box-sizing: border-box; }
+        html, body { overflow-x: hidden; max-width: 100vw; background: #ECE9D8; }
+        img { max-width: 100%; }
+        @media (max-width: 820px) {
+          .zm-sidebar { width: 64px !important; }
+          .zm-sidebar .zm-sidebar-label { display: none !important; }
+          .zm-main-content { margin-left: 64px !important; }
+          .zm-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .zm-dash-grid { grid-template-columns: 1fr !important; }
+          .zm-fin-grid { grid-template-columns: 1fr !important; }
+          .zm-form-grid3 { grid-template-columns: 1fr 1fr !important; }
+        }
+        @media (max-width: 480px) {
+          .zm-stat-grid { grid-template-columns: 1fr !important; }
+          .zm-form-grid2 { grid-template-columns: 1fr !important; }
+          .zm-form-grid3 { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
       <Sidebar active={page} setActive={setPage} onLogout={() => signOut(auth)} />
-      <div style={{ marginLeft: 220, flex: 1, minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div className="zm-main-content" style={{ marginLeft: 220, flex: 1, minHeight: "100vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Header title={titles[page]} />
-        <main style={{ flex: 1, overflow: "auto" }}>
+        <main style={{ flex: 1, overflow: "auto", background: T.bg }}>
           {page === "dashboard" && <DashboardView cars={cars} orders={orders} transactions={transactions} />}
           {page === "inventaris" && <InventarisView cars={cars} setCars={setCars} />}
           {page === "crm" && <CRMView orders={orders} setOrders={setOrders} />}
