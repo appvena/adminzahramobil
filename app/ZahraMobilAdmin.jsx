@@ -3,6 +3,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { db, auth } from "./firebase";
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // ─── MOCK DATA ───────────────────────────────────────────────────────────────
 const INSPECTION_CATEGORIES = [
@@ -248,10 +249,31 @@ function InventarisView({ cars, setCars }) {
   const [form, setForm] = useState(blank);
   const [dragOver, setDragOver] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
   const fileRef = useRef();
 
   const reset = () => { setForm(blank); setEditId(null); };
   const handleEdit = (car) => { setForm({ ...car }); setEditId(car.id); setShowForm(true); };
+
+  const uploadFiles = async (fileList) => {
+    const files = Array.from(fileList).filter(f => f.type.startsWith("image/"));
+    if (files.length === 0) return;
+    setUploadingCount(c => c + files.length);
+    const storage = getStorage();
+    for (const file of files) {
+      try {
+        const path = `cars/${Date.now()}_${file.name}`;
+        const storageRef = ref(storage, path);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+        setForm(prev => ({ ...prev, images: [...prev.images, url] }));
+      } catch (e) {
+        alert(`Gagal mengunggah foto "${file.name}". Silakan coba lagi.`);
+      } finally {
+        setUploadingCount(c => c - 1);
+      }
+    }
+  };
 
   const handleSave = async () => {
     if (!form.brand || !form.model || !form.price) return alert("Brand, Model, dan Harga Jual wajib diisi.");
@@ -283,8 +305,7 @@ function InventarisView({ cars, setCars }) {
 
   const handleDrop = useCallback((e) => {
     e.preventDefault(); setDragOver(false);
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
-    files.forEach(file => { const url = URL.createObjectURL(file); setForm(f => ({ ...f, images: [...f.images, url] })); });
+    uploadFiles(e.dataTransfer.files);
   }, []);
 
   const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
@@ -308,7 +329,10 @@ function InventarisView({ cars, setCars }) {
             <div onDragOver={e => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={handleDrop}
               style={{ border: `2px dashed ${dragOver ? T.accent : T.border}`, borderRadius: 2, padding: 24, textAlign: "center", marginBottom: 20, cursor: "pointer", background: dragOver ? `${T.accent}11` : "transparent" }}
               onClick={() => fileRef.current.click()}>
-              <input ref={fileRef} type="file" multiple accept="image/*" style={{ display: "none" }} onChange={e => Array.from(e.target.files).forEach(f => { const url = URL.createObjectURL(f); setForm(prev => ({ ...prev, images: [...prev.images, url] })); })} />
+              <input ref={fileRef} type="file" multiple accept="image/*" style={{ display: "none" }} onChange={e => uploadFiles(e.target.files)} />
+              {uploadingCount > 0 && (
+                <div style={{ color: T.accent, fontSize: 12, fontWeight: 700, marginBottom: 10 }}>⏳ Mengunggah {uploadingCount} foto...</div>
+              )}
               {form.images.length > 0 ? (
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
                   {form.images.map((img, i) => (
@@ -377,7 +401,7 @@ function InventarisView({ cars, setCars }) {
             </div>
 
             <div style={{ display: "flex", gap: 12 }}>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "9px", ...(saving ? { background: "#bbb", border: "1px solid #999", color: "#fff", borderRadius: 3 } : xpBtn(true)), fontWeight: 700, fontSize: 13, cursor: saving ? "default" : "pointer" }}>{saving ? "Menyimpan..." : editId ? "Simpan Perubahan" : "Tambah Unit"}</button>
+              <button onClick={handleSave} disabled={saving || uploadingCount > 0} style={{ flex: 1, padding: "9px", ...((saving || uploadingCount > 0) ? { background: "#bbb", border: "1px solid #999", color: "#fff", borderRadius: 3 } : xpBtn(true)), fontWeight: 700, fontSize: 13, cursor: (saving || uploadingCount > 0) ? "default" : "pointer" }}>{saving ? "Menyimpan..." : uploadingCount > 0 ? "Tunggu unggah foto..." : editId ? "Simpan Perubahan" : "Tambah Unit"}</button>
               <button onClick={() => setShowForm(false)} style={{ padding: "12px 24px", background: "transparent", color: T.muted, border: `1px solid ${T.border}`, borderRadius: 7, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Batal</button>
             </div>
           </div>
