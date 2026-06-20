@@ -25,8 +25,35 @@ const STATUS_OPTS = ["Ready", "Booking", "Terjual"];
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
-const T = { bg: "#0f1117", card: "#171b24", border: "#252b38", text: "#e2e8f0", muted: "#64748b", accent: "#3B82F6", gold: "#C9A84C", green: "#10b981", red: "#ef4444", amber: "#f59e0b" };
-const card = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 10 };
+const T = {
+  bg: "#ECE9D8",            // desktop/window background khas XP
+  card: "#FFFFFF",
+  border: "#7F9DB9",        // border biru-abu khas XP
+  text: "#000000",
+  muted: "#5A5A5A",
+  accent: "#316AC5",        // biru highlight XP
+  gold: "#C9A84C",
+  green: "#1A8A1A",
+  red: "#C42B1C",
+  amber: "#E6A817",
+};
+const xpFont = "'Tahoma', 'Segoe UI', Verdana, sans-serif";
+const card = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 0, boxShadow: "inset 1px 1px 0 #fff" };
+// Title bar gradient biru khas jendela XP
+const xpTitlebar = {
+  background: "linear-gradient(180deg, #0997FF 0%, #0058E6 8%, #0050D8 40%, #1C6FE8 60%, #0050D8 88%, #003BBF 100%)",
+  color: "#fff", fontWeight: 700, fontSize: 12, fontFamily: xpFont,
+  padding: "5px 10px", borderRadius: "5px 5px 0 0", display: "flex", alignItems: "center", gap: 6,
+};
+// Tombol bevel timbul khas XP
+const xpBtn = (active) => ({
+  fontFamily: xpFont,
+  background: active ? "linear-gradient(180deg, #3D94FF, #1A5FD0)" : "linear-gradient(180deg, #FDFDFD, #ECEBE5)",
+  border: "1px solid " + (active ? "#0A3E9E" : "#919B9C"),
+  borderRadius: 3,
+  boxShadow: active ? "inset 1px 1px 2px rgba(0,0,0,0.3)" : "inset 1px 1px 0 #fff",
+  color: active ? "#fff" : "#000",
+});
 
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 const NAV = [
@@ -38,26 +65,28 @@ const NAV = [
 
 function Sidebar({ active, setActive, onLogout }) {
   return (
-    <aside style={{ width: 220, background: "#0d1118", borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column", minHeight: "100vh", position: "fixed", top: 0, left: 0, zIndex: 100 }}>
-      <div style={{ padding: "24px 20px 20px", borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, background: T.gold, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#0a0a0a", fontSize: 14 }}>Z</div>
-          <div><div style={{ color: "#fff", fontWeight: 700, fontSize: 14, letterSpacing: "0.04em" }}>ZAHRA MOBIL</div><div style={{ color: T.muted, fontSize: 10, letterSpacing: "0.08em" }}>ADMIN PANEL</div></div>
-        </div>
+    <aside style={{ width: 220, background: "linear-gradient(180deg, #2A6EBB 0%, #1B4F91 100%)", borderRight: "2px solid #0A3E9E", display: "flex", flexDirection: "column", minHeight: "100vh", position: "fixed", top: 0, left: 0, zIndex: 100, fontFamily: xpFont }}>
+      <div style={{ ...xpTitlebar, borderRadius: 0, padding: "8px 12px" }}>
+        <div style={{ width: 22, height: 22, background: T.gold, border: "1px solid #8a6d1f", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#000", fontSize: 12 }}>Z</div>
+        <div style={{ lineHeight: 1.2 }}><div style={{ fontSize: 13 }}>ZAHRA MOBIL</div><div style={{ fontSize: 9, opacity: 0.85, fontWeight: 400 }}>ADMIN PANEL</div></div>
       </div>
-      <nav style={{ padding: "16px 10px", flex: 1 }}>
+      <nav style={{ padding: 10, flex: 1 }}>
         {NAV.map(n => (
-          <button key={n.key} onClick={() => setActive(n.key)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 7, border: "none", cursor: "pointer", marginBottom: 4, background: active === n.key ? `${T.accent}22` : "transparent", color: active === n.key ? T.accent : T.muted, fontWeight: active === n.key ? 700 : 500, fontSize: 13, textAlign: "left" }}>
+          <button key={n.key} onClick={() => setActive(n.key)} style={{
+            width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: active === n.key ? "1px solid #fff" : "1px solid transparent",
+            cursor: "pointer", marginBottom: 3, background: active === n.key ? "rgba(255,255,255,0.25)" : "transparent",
+            color: "#fff", fontWeight: active === n.key ? 700 : 400, fontSize: 12.5, textAlign: "left", fontFamily: xpFont, borderRadius: 3,
+          }}>
             <span style={{ fontSize: 16 }}>{n.icon}</span> {n.label}
           </button>
         ))}
       </nav>
-      <div style={{ padding: "16px 20px", borderTop: `1px solid ${T.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <div style={{ width: 32, height: 32, background: "#1e293b", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>👤</div>
-          <div><div style={{ color: T.text, fontSize: 12, fontWeight: 600 }}>Admin</div><div style={{ color: T.muted, fontSize: 11 }}>Super Admin</div></div>
+      <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.3)", background: "rgba(0,0,0,0.1)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <div style={{ width: 28, height: 28, background: "#fff", border: "1px solid #0A3E9E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>👤</div>
+          <div><div style={{ color: "#fff", fontSize: 11.5, fontWeight: 700 }}>Admin</div><div style={{ color: "#cfe0f7", fontSize: 10 }}>Super Admin</div></div>
         </div>
-        <button onClick={onLogout} style={{ width: "100%", padding: "8px", background: "transparent", border: `1px solid ${T.border}`, borderRadius: 6, color: T.muted, fontSize: 12, cursor: "pointer" }}>
+        <button onClick={onLogout} style={{ width: "100%", padding: "5px", ...xpBtn(false), fontSize: 11.5, cursor: "pointer" }}>
           Keluar
         </button>
       </div>
@@ -68,12 +97,12 @@ function Sidebar({ active, setActive, onLogout }) {
 function Header({ title }) {
   const now = new Date().toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   return (
-    <header style={{ background: T.bg, borderBottom: `1px solid ${T.border}`, padding: "16px 28px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <h1 style={{ color: T.text, margin: 0, fontSize: 20, fontWeight: 700 }}>{title}</h1>
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <span style={{ color: T.muted, fontSize: 12 }}>{now}</span>
-        <div style={{ width: 8, height: 8, background: T.green, borderRadius: "50%", boxShadow: `0 0 8px ${T.green}` }} />
-        <span style={{ color: T.muted, fontSize: 12 }}>Live</span>
+    <header style={{ ...xpTitlebar, borderRadius: 0, padding: "8px 16px", justifyContent: "space-between" }}>
+      <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, fontFamily: xpFont, color: "#fff" }}>📁 {title}</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 11, opacity: 0.9 }}>{now}</span>
+        <div style={{ width: 8, height: 8, background: "#7CFF7C", borderRadius: "50%", boxShadow: "0 0 6px #7CFF7C", border: "1px solid #2a8a2a" }} />
+        <span style={{ fontSize: 11, opacity: 0.9 }}>Live</span>
       </div>
     </header>
   );
@@ -81,14 +110,14 @@ function Header({ title }) {
 
 function StatCard({ icon, label, value, sub, color }) {
   return (
-    <div style={{ ...card, padding: "20px 24px" }}>
+    <div style={{ ...card, padding: "16px 18px", fontFamily: xpFont }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         <div>
-          <div style={{ color: T.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{label}</div>
-          <div style={{ color: T.text, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 4 }}>{value}</div>
-          {sub && <div style={{ color: color || T.muted, fontSize: 12 }}>{sub}</div>}
+          <div style={{ color: T.muted, fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6, fontWeight: 700 }}>{label}</div>
+          <div style={{ color: T.text, fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{value}</div>
+          {sub && <div style={{ color: color || T.muted, fontSize: 11 }}>{sub}</div>}
         </div>
-        <div style={{ width: 42, height: 42, background: `${color || T.accent}22`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{icon}</div>
+        <div style={{ width: 38, height: 38, background: "#fff", border: `2px solid ${color || T.accent}`, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{icon}</div>
       </div>
     </div>
   );
@@ -145,7 +174,7 @@ function DashboardView({ cars, orders, transactions }) {
           {[{ label: "Ready", count: totalStok, color: T.green }, { label: "Booking", count: totalBooking, color: T.amber }, { label: "Terjual", count: totalTerjual, color: T.accent }].map(item => (
             <div key={item.label} style={{ marginBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><span style={{ color: T.text, fontSize: 13 }}>{item.label}</span><span style={{ color: item.color, fontSize: 13, fontWeight: 700 }}>{item.count} unit</span></div>
-              <div style={{ background: "#1e293b", borderRadius: 99, height: 6 }}><div style={{ width: `${(item.count / cars.length) * 100}%`, background: item.color, borderRadius: 99, height: "100%" }} /></div>
+              <div style={{ background: "#fff", borderRadius: 99, height: 6 }}><div style={{ width: `${(item.count / cars.length) * 100}%`, background: item.color, borderRadius: 99, height: "100%" }} /></div>
             </div>
           ))}
           <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
@@ -197,7 +226,7 @@ function InspectionForm({ inspection, setInspection }) {
           );
         })}
       </div>
-      <div style={{ background: "#0f1117", border: `1px solid ${T.border}`, borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflow: "auto" }}>
+      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflow: "auto" }}>
         {inspection[openCat].map((item, idx) => (
           <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#171b24", borderRadius: 6 }}>
             <span style={{ color: T.text, fontSize: 12.5, flex: 1 }}>{item.name}</span>
@@ -258,18 +287,18 @@ function InventarisView({ cars, setCars }) {
     files.forEach(file => { const url = URL.createObjectURL(file); setForm(f => ({ ...f, images: [...f.images, url] })); });
   }, []);
 
-  const inp = { background: "#1e293b", border: `1px solid ${T.border}`, borderRadius: 6, padding: "9px 12px", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+  const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
 
   return (
     <div style={{ padding: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div style={{ color: T.muted, fontSize: 13 }}>{cars.length} unit terdaftar</div>
-        <button onClick={() => { reset(); setShowForm(true); }} style={{ padding: "9px 20px", background: T.accent, color: "#fff", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>+ Tambah Unit</button>
+        <button onClick={() => { reset(); setShowForm(true); }} style={{ padding: "7px 18px", ...xpBtn(true), fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>+ Tambah Unit</button>
       </div>
 
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={e => e.target === e.currentTarget && setShowForm(false)}>
-          <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, width: "92%", maxWidth: 760, maxHeight: "92vh", overflow: "auto", padding: 32 }}>
+          <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 6, width: "92%", maxWidth: 760, maxHeight: "92vh", overflow: "auto", padding: 32 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
               <h2 style={{ color: T.text, margin: 0, fontSize: 18, fontWeight: 700 }}>{editId ? "Edit Unit" : "Tambah Unit Baru"}</h2>
               <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", color: T.muted, fontSize: 22, cursor: "pointer" }}>×</button>
@@ -277,7 +306,7 @@ function InventarisView({ cars, setCars }) {
 
             {/* Image upload */}
             <div onDragOver={e => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={handleDrop}
-              style={{ border: `2px dashed ${dragOver ? T.accent : T.border}`, borderRadius: 10, padding: 24, textAlign: "center", marginBottom: 20, cursor: "pointer", background: dragOver ? `${T.accent}11` : "transparent" }}
+              style={{ border: `2px dashed ${dragOver ? T.accent : T.border}`, borderRadius: 2, padding: 24, textAlign: "center", marginBottom: 20, cursor: "pointer", background: dragOver ? `${T.accent}11` : "transparent" }}
               onClick={() => fileRef.current.click()}>
               <input ref={fileRef} type="file" multiple accept="image/*" style={{ display: "none" }} onChange={e => Array.from(e.target.files).forEach(f => { const url = URL.createObjectURL(f); setForm(prev => ({ ...prev, images: [...prev.images, url] })); })} />
               {form.images.length > 0 ? (
@@ -334,21 +363,21 @@ function InventarisView({ cars, setCars }) {
               <InspectionForm inspection={form.inspection} setInspection={fn => setForm(f => ({ ...f, inspection: typeof fn === "function" ? fn(f.inspection) : fn }))} />
             </div>
 
-            <div style={{ display: "flex", gap: 20, alignItems: "center", marginBottom: 24, background: "#1e293b", padding: "12px 16px", borderRadius: 8 }}>
+            <div style={{ display: "flex", gap: 20, alignItems: "center", marginBottom: 24, background: "#fff", padding: "12px 16px", borderRadius: 8 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: T.text, fontSize: 13 }}>
                 <input type="checkbox" checked={form.showInHero} onChange={e => setForm(f => ({ ...f, showInHero: e.target.checked }))} style={{ accentColor: T.accent, width: 16, height: 16 }} />
                 Tampilkan di Slide Utama (Hero)
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ color: T.muted, fontSize: 13 }}>Status:</span>
-                <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={{ background: "#0f1117", border: `1px solid ${T.border}`, borderRadius: 6, padding: "5px 10px", color: T.text, fontSize: 13 }}>
+                <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 6, padding: "5px 10px", color: T.text, fontSize: 13 }}>
                   {STATUS_OPTS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             </div>
 
             <div style={{ display: "flex", gap: 12 }}>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "12px", background: saving ? "#555" : T.accent, color: "#fff", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 14, cursor: saving ? "default" : "pointer" }}>{saving ? "Menyimpan..." : editId ? "Simpan Perubahan" : "Tambah Unit"}</button>
+              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "9px", ...(saving ? { background: "#bbb", border: "1px solid #999", color: "#fff", borderRadius: 3 } : xpBtn(true)), fontWeight: 700, fontSize: 13, cursor: saving ? "default" : "pointer" }}>{saving ? "Menyimpan..." : editId ? "Simpan Perubahan" : "Tambah Unit"}</button>
               <button onClick={() => setShowForm(false)} style={{ padding: "12px 24px", background: "transparent", color: T.muted, border: `1px solid ${T.border}`, borderRadius: 7, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Batal</button>
             </div>
           </div>
@@ -373,12 +402,12 @@ function InventarisView({ cars, setCars }) {
                 <td style={{ padding: "12px 16px", color: T.green, fontWeight: 600, fontSize: 13 }}>{car.priceBeli ? fmtShort(car.price - car.priceBeli) : "—"}</td>
                 <td style={{ padding: "12px 16px" }}>
                   <select value={car.status} onChange={e => updateDoc(doc(db, "cars", car.id), { status: e.target.value }).catch(() => alert("Gagal update status."))}
-                    style={{ background: car.status === "Ready" ? `${T.green}22` : car.status === "Booking" ? `${T.amber}22` : "#1e293b", color: car.status === "Ready" ? T.green : car.status === "Booking" ? T.amber : T.muted, border: `1px solid ${car.status === "Ready" ? T.green : car.status === "Booking" ? T.amber : T.border}44`, borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    style={{ background: car.status === "Ready" ? `${T.green}22` : car.status === "Booking" ? `${T.amber}22` : "#fff", color: car.status === "Ready" ? T.green : car.status === "Booking" ? T.amber : T.muted, border: `1px solid ${car.status === "Ready" ? T.green : car.status === "Booking" ? T.amber : T.border}44`, borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     {STATUS_OPTS.map(s => <option key={s} value={s} style={{ background: T.card, color: T.text }}>{s}</option>)}
                   </select>
                 </td>
                 <td style={{ padding: "12px 16px" }}>
-                  <button onClick={() => updateDoc(doc(db, "cars", car.id), { showInHero: !car.showInHero }).catch(() => alert("Gagal update."))} style={{ width: 44, height: 24, borderRadius: 99, border: "none", cursor: "pointer", background: car.showInHero ? T.accent : "#2d3748", position: "relative" }}>
+                  <button onClick={() => updateDoc(doc(db, "cars", car.id), { showInHero: !car.showInHero }).catch(() => alert("Gagal update."))} style={{ width: 44, height: 24, borderRadius: 99, border: "none", cursor: "pointer", background: car.showInHero ? T.accent : "#c5c5c5", position: "relative" }}>
                     <div style={{ width: 18, height: 18, background: "#fff", borderRadius: "50%", position: "absolute", top: 3, left: car.showInHero ? 23 : 3, transition: "left 0.2s" }} />
                   </button>
                 </td>
@@ -419,7 +448,7 @@ function CRMView({ orders, setOrders }) {
           const color = stageColor[stage];
           return (
             <div key={stage} onDragOver={e => { e.preventDefault(); setOver(stage); }} onDragLeave={() => setOver(null)} onDrop={() => handleDrop(stage)}
-              style={{ background: over === stage ? `${color}11` : T.card, border: `1px solid ${over === stage ? color : T.border}`, borderRadius: 10, minHeight: 200, minWidth: 220 }}>
+              style={{ background: over === stage ? `${color}11` : T.card, border: `1px solid ${over === stage ? color : T.border}`, borderRadius: 2, minHeight: 200, minWidth: 220 }}>
               <div style={{ padding: "14px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 8, height: 8, background: color, borderRadius: "50%" }} />
@@ -430,7 +459,7 @@ function CRMView({ orders, setOrders }) {
               <div style={{ padding: "12px 10px", display: "flex", flexDirection: "column", gap: 10 }}>
                 {stageOrders.map(o => (
                   <div key={o.id} draggable onDragStart={() => setDragging(o.id)} onDragEnd={() => { setDragging(null); setOver(null); }}
-                    style={{ background: dragging === o.id ? `${color}22` : "#1e293b", border: `1px solid ${dragging === o.id ? color : T.border}`, borderRadius: 8, padding: "12px 14px", cursor: "grab", opacity: dragging === o.id ? 0.7 : 1 }}>
+                    style={{ background: dragging === o.id ? `${color}22` : "#fff", border: `1px solid ${dragging === o.id ? color : T.border}`, borderRadius: 8, padding: "12px 14px", cursor: "grab", opacity: dragging === o.id ? 0.7 : 1 }}>
                     <div style={{ color: T.text, fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{o.name}</div>
                     <div style={{ color: T.muted, fontSize: 11, marginBottom: 6 }}>📱 {o.phone}</div>
                     <div style={{ color, fontSize: 11, fontWeight: 600, marginBottom: 4 }}>🚗 {o.unit}</div>
@@ -475,7 +504,7 @@ function FinanceView({ transactions, setTransactions, cars }) {
     }
   };
 
-  const inp = { background: "#1e293b", border: `1px solid ${T.border}`, borderRadius: 6, padding: "9px 12px", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+  const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
   const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun"];
   const mockMonthly = [820, 1150, 690, 1420, 1680, pemasukan / 1e6];
   const maxVal = Math.max(...mockMonthly);
@@ -509,7 +538,7 @@ function FinanceView({ transactions, setTransactions, cars }) {
             <input style={inp} type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="Contoh: 120000000" /></div>
           <div style={{ marginBottom: 16 }}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Keterangan</label>
             <input style={inp} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Contoh: Pelunasan dari leasing Adira..." /></div>
-          <button onClick={handleAdd} style={{ width: "100%", padding: "11px", background: form.category === "Pemasukan" ? T.green : T.red, color: "#fff", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>+ Tambah Transaksi</button>
+          <button onClick={handleAdd} style={{ width: "100%", padding: "8px", ...xpBtn(true), background: form.category === "Pemasukan" ? "linear-gradient(180deg, #4DBE4D, #1A8A1A)" : "linear-gradient(180deg, #E05858, #C42B1C)", border: "1px solid " + (form.category === "Pemasukan" ? "#1A8A1A" : "#C42B1C"), fontWeight: 700, fontSize: 13, cursor: "pointer" }}>+ Tambah Transaksi</button>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -563,7 +592,7 @@ function LoginScreen({ onLoginSuccess }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const inp = { background: "#1e293b", border: `1px solid ${T.border}`, borderRadius: 6, padding: "11px 14px", color: T.text, fontSize: 14, outline: "none", width: "100%", boxSizing: "border-box" };
+  const inp = { background: "#fff", border: "1px solid #7F9DB9", borderRadius: 0, padding: "6px 8px", color: "#000", fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box", fontFamily: xpFont, boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.15)" };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -580,24 +609,29 @@ function LoginScreen({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{ background: T.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', system-ui, sans-serif", padding: 20 }}>
-      <form onSubmit={handleLogin} style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: 36, width: "100%", maxWidth: 380, boxSizing: "border-box" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 28, justifyContent: "center" }}>
-          <div style={{ width: 34, height: 34, background: T.gold, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#0a0a0a", fontSize: 15 }}>Z</div>
-          <div style={{ color: "#fff", fontWeight: 700, fontSize: 16, letterSpacing: "0.04em" }}>ZAHRA MOBIL <span style={{ color: T.muted, fontWeight: 400 }}>ADMIN</span></div>
+    <div style={{ background: "linear-gradient(180deg, #5A8FD6 0%, #2A5DA8 50%, #7CB0E8 100%)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: xpFont, padding: 20 }}>
+      <form onSubmit={handleLogin} style={{ background: "#ECE9D8", border: "1px solid #0A3E9E", borderRadius: 8, padding: 0, width: "100%", maxWidth: 360, boxSizing: "border-box", boxShadow: "3px 3px 14px rgba(0,0,0,0.4)", overflow: "hidden" }}>
+        <div style={{ ...xpTitlebar, borderRadius: "7px 7px 0 0", padding: "7px 10px" }}>
+          <div style={{ width: 18, height: 18, background: T.gold, border: "1px solid #8a6d1f", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#000", fontSize: 10 }}>Z</div>
+          <span>Log On to Zahra Mobil Admin</span>
         </div>
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Email</label>
-          <input type="email" required style={inp} value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@zahramobil.com" />
+        <div style={{ padding: "24px 28px" }}>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#0A3E9E" }}>ZAHRA MOBIL <span style={{ color: T.muted, fontWeight: 400 }}>ADMIN</span></div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ color: "#000", fontSize: 12, display: "block", marginBottom: 4, fontWeight: 700 }}>Email:</label>
+            <input type="email" required style={inp} value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@zahramobil.com" />
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ color: "#000", fontSize: 12, display: "block", marginBottom: 4, fontWeight: 700 }}>Password:</label>
+            <input type="password" required style={inp} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+          </div>
+          {error && <div style={{ color: T.red, fontSize: 11.5, marginBottom: 14, textAlign: "center", fontWeight: 700 }}>{error}</div>}
+          <button type="submit" disabled={loading} style={{ width: "100%", padding: "8px", ...xpBtn(true), fontWeight: 700, fontSize: 13, cursor: loading ? "default" : "pointer" }}>
+            {loading ? "Memproses..." : "Masuk ▸"}
+          </button>
         </div>
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Password</label>
-          <input type="password" required style={inp} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
-        </div>
-        {error && <div style={{ color: T.red, fontSize: 12, marginBottom: 14, textAlign: "center" }}>{error}</div>}
-        <button type="submit" disabled={loading} style={{ width: "100%", padding: "12px", background: loading ? "#555" : T.accent, color: "#fff", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 14, cursor: loading ? "default" : "pointer" }}>
-          {loading ? "Memproses..." : "Masuk"}
-        </button>
       </form>
     </div>
   );
@@ -651,7 +685,7 @@ export default function ZahraMobilAdmin() {
   }
 
   return (
-    <div style={{ background: T.bg, minHeight: "100vh", fontFamily: "'Inter', system-ui, sans-serif", display: "flex" }}>
+    <div style={{ background: T.bg, minHeight: "100vh", fontFamily: xpFont, display: "flex" }}>
       <Sidebar active={page} setActive={setPage} onLogout={() => signOut(auth)} />
       <div style={{ marginLeft: 220, flex: 1, minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         <Header title={titles[page]} />
