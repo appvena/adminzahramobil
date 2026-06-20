@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { db, auth } from "./firebase";
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, increment } from "firebase/firestore";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 
 // ─── MOCK DATA ───────────────────────────────────────────────────────────────
@@ -18,9 +18,25 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.9.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
+const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
+
+// Catat estimasi pemakaian storage ke Firestore (collection "meta", dokumen "storage").
+// Ini PERKIRAAN berdasarkan ukuran file yang diupload, bukan angka resmi dari Cloudinary,
+// karena API resmi Cloudinary butuh API Secret yang tidak aman ditaruh di kode frontend.
+async function recordStorageUsage(bytes) {
+  try {
+    await setDoc(doc(db, "meta", "storage"), {
+      totalBytes: increment(bytes || 0),
+      fileCount: increment(1),
+      lastUpdated: new Date().toISOString(),
+    }, { merge: true });
+  } catch (e) {
+    console.error("Gagal mencatat penggunaan storage:", e);
+  }
+}
 
 const STAGES = ["Pesanan Baru", "Verifikasi Data", "Proses Leasing/Pelunasan", "Penyiapan Towing", "Mobil Terkirim"];
 const STAGE_SHORT = { "Pesanan Baru": "Baru", "Verifikasi Data": "Verifikasi", "Proses Leasing/Pelunasan": "Leasing/Lunas", "Penyiapan Towing": "Towing", "Mobil Terkirim": "Terkirim" };
@@ -145,7 +161,7 @@ function StatCard({ icon, label, value, sub, color }) {
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
-function DashboardView({ cars, orders, transactions }) {
+function DashboardView({ cars, orders, transactions, storageMeta }) {
   const totalStok = cars.filter(c => c.status === "Ready").length;
   const totalBooking = cars.filter(c => c.status === "Booking").length;
   const totalTerjual = cars.filter(c => c.status === "Terjual").length;
@@ -158,6 +174,10 @@ function DashboardView({ cars, orders, transactions }) {
   const omsetData = [820, 1150, 690, 1420, 1680, totalOmset / 1e6];
   const maxVal = Math.max(...omsetData);
 
+  const usedGB = (storageMeta?.totalBytes || 0) / (1024 * 1024 * 1024);
+  const usedPct = Math.min((usedGB / STORAGE_LIMIT_GB) * 100, 100);
+  const storageColor = usedPct >= 90 ? T.red : usedPct >= 70 ? T.amber : T.green;
+
   return (
     <div style={{ padding: 28 }}>
       <div className="zm-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
@@ -165,6 +185,23 @@ function DashboardView({ cars, orders, transactions }) {
         <StatCard icon="📋" label="Unit Booking" value={totalBooking} sub="Dalam proses" color={T.amber} />
         <StatCard icon="✅" label="Terjual" value={totalTerjual} sub="Total" color={T.accent} />
         <StatCard icon="🔔" label="Pesanan Baru" value={orderBaru} sub="Perlu ditindak" color="#a855f7" />
+      </div>
+
+      <div style={{ ...card, padding: "18px 24px", marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+          <div style={{ color: T.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em" }}>☁️ Penyimpanan Foto (Cloudinary — Estimasi)</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: storageColor }}>{usedGB.toFixed(2)} GB / {STORAGE_LIMIT_GB} GB</div>
+        </div>
+        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, height: 14, overflow: "hidden", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.15)" }}>
+          <div style={{ width: `${usedPct}%`, background: storageColor, height: "100%", transition: "width 0.4s" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+          <span style={{ color: T.muted, fontSize: 10.5 }}>{storageMeta?.fileCount || 0} foto terunggah</span>
+          {usedPct >= 70 && <span style={{ color: storageColor, fontSize: 10.5, fontWeight: 700 }}>{usedPct >= 90 ? "⚠️ Hampir penuh!" : "Perhatikan penggunaan"}</span>}
+        </div>
+        <div style={{ color: "#8a8a7a", fontSize: 9.5, marginTop: 6, fontStyle: "italic" }}>
+          *Estimasi dari ukuran file yang diunggah lewat Dashboard ini. Batas asli akun Cloudinary adalah 25GB; ambang 20GB dipasang sebagai peringatan dini.
+        </div>
       </div>
 
       <div className="zm-dash-grid" style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 20, marginBottom: 24 }}>
@@ -295,7 +332,7 @@ function InventarisView({ cars, setCars }) {
         try {
           const json = JSON.parse(xhr.responseText);
           if (xhr.status >= 200 && xhr.status < 300 && json.secure_url) {
-            resolve(json.secure_url);
+            resolve({ url: json.secure_url, bytes: json.bytes || file.size });
           } else {
             reject(new Error(json.error?.message || `Status ${xhr.status}`));
           }
@@ -317,8 +354,9 @@ function InventarisView({ cars, setCars }) {
     setUploadingCount(c => c + files.length);
     for (const file of files) {
       try {
-        const url = await uploadOneFile(file);
+        const { url, bytes } = await uploadOneFile(file);
         setForm(prev => ({ ...prev, images: [...prev.images, url] }));
+        recordStorageUsage(bytes);
       } catch (e) {
         alert(`Gagal mengunggah foto "${file.name}": ${e.message}`);
       } finally {
@@ -736,6 +774,7 @@ export default function ZahraMobilAdmin() {
   const [cars, setCars] = useState([]);
   const [orders, setOrders] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [storageMeta, setStorageMeta] = useState({ totalBytes: 0, fileCount: 0 });
 
   // Cek status login
   useEffect(() => {
@@ -758,7 +797,10 @@ export default function ZahraMobilAdmin() {
     const unsubTx = onSnapshot(collection(db, "transactions"), (snap) => {
       setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => { unsubCars(); unsubOrders(); unsubTx(); };
+    const unsubStorage = onSnapshot(doc(db, "meta", "storage"), (snap) => {
+      if (snap.exists()) setStorageMeta(snap.data());
+    });
+    return () => { unsubCars(); unsubOrders(); unsubTx(); unsubStorage(); };
   }, [user]);
 
   const titles = { dashboard: "Dashboard Overview", inventaris: "Manajemen Inventaris", crm: "Sales CRM — Kanban Board", finance: "Modul Finance" };
@@ -803,7 +845,7 @@ export default function ZahraMobilAdmin() {
       <div className="zm-main-content" style={{ marginLeft: 220, flex: 1, minHeight: "100vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Header title={titles[page]} />
         <main style={{ flex: 1, overflow: "auto", background: T.bg }}>
-          {page === "dashboard" && <DashboardView cars={cars} orders={orders} transactions={transactions} />}
+          {page === "dashboard" && <DashboardView cars={cars} orders={orders} transactions={transactions} storageMeta={storageMeta} />}
           {page === "inventaris" && <InventarisView cars={cars} setCars={setCars} />}
           {page === "crm" && <CRMView orders={orders} setOrders={setOrders} />}
           {page === "finance" && <FinanceView transactions={transactions} setTransactions={setTransactions} cars={cars} />}
