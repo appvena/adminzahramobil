@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.7.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 
@@ -60,6 +60,17 @@ const xpBtn = (active) => ({
 });
 
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+// ─── NAVIGASI MODUL ──────────────────────────────────────────────────────────
+// Untuk menambah modul baru di masa depan, ikuti 3 langkah ini:
+// 1. Tambah 1 baris baru di array NAV ini, contoh:
+//    { key: "karyawan", icon: "👥", label: "Karyawan" }
+// 2. Buat function komponen baru, contoh: function KaryawanView({ ...props }) { ... }
+//    (letakkan sejajar dengan DashboardView, InventarisView, CRMView, FinanceView di bawah)
+// 3. Daftarkan render-nya di komponen App utama (cari blok {page === "dashboard" && ...}),
+//    tambah baris: {page === "karyawan" && <KaryawanView ... />}
+// Kalau modul baru butuh data sendiri di Firestore, buat collection baru
+// (lihat pola onSnapshot(collection(db, "cars"/"orders"/"transactions")) di App utama)
+// dan jangan lupa tambahkan Security Rules-nya di Firebase Console.
 const NAV = [
   { key: "dashboard", icon: "📊", label: "Dashboard" },
   { key: "inventaris", icon: "🚗", label: "Inventaris" },
@@ -71,7 +82,7 @@ function Sidebar({ active, setActive, onLogout }) {
   return (
     <aside className="zm-sidebar" style={{ width: 220, background: "linear-gradient(180deg, #2A6EBB 0%, #1B4F91 100%)", borderRight: "2px solid #0A3E9E", display: "flex", flexDirection: "column", minHeight: "100vh", position: "fixed", top: 0, left: 0, zIndex: 100, fontFamily: xpFont, overflow: "hidden" }}>
       <div style={{ ...xpTitlebar, borderRadius: 0, padding: "8px 12px" }}>
-        <div style={{ width: 22, height: 22, background: T.gold, border: "1px solid #8a6d1f", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#000", fontSize: 12, flexShrink: 0 }}>Z</div>
+        <img src="/adminzahramobil/logo.png" alt="ZM Showroom" style={{ height: 24, width: "auto", flexShrink: 0, objectFit: "contain" }} />
         <div className="zm-sidebar-label" style={{ lineHeight: 1.2 }}><div style={{ fontSize: 13 }}>ZAHRA MOBIL</div><div style={{ fontSize: 9, opacity: 0.85, fontWeight: 400 }}>ADMIN PANEL</div></div>
       </div>
       <nav style={{ padding: 10, flex: 1 }}>
@@ -90,12 +101,10 @@ function Sidebar({ active, setActive, onLogout }) {
           <div style={{ width: 28, height: 28, background: "#fff", border: "1px solid #0A3E9E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>👤</div>
           <div><div style={{ color: "#fff", fontSize: 11.5, fontWeight: 700 }}>Admin</div><div style={{ color: "#cfe0f7", fontSize: 10 }}>Super Admin</div></div>
         </div>
-        <button onClick={onLogout} style={{ width: "100%", padding: "5px", ...xpBtn(false), fontSize: 11.5, cursor: "pointer" }}>
+        <button onClick={onLogout} title="Keluar" style={{ width: "100%", padding: "6px", ...xpBtn(false), fontSize: 11.5, cursor: "pointer" }}>
           <span className="zm-sidebar-label">Keluar</span>
+          <span className="zm-sidebar-icon-only">🚪</span>
         </button>
-        <div className="zm-sidebar-label" style={{ textAlign: "center", marginTop: 10, color: "#aecbed", fontSize: 9.5 }}>
-          v{APP_VERSION} · ©2026 SRISP
-        </div>
       </div>
     </aside>
   );
@@ -104,14 +113,19 @@ function Sidebar({ active, setActive, onLogout }) {
 function Header({ title }) {
   const now = new Date().toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   return (
-    <header style={{ ...xpTitlebar, borderRadius: 0, padding: "8px 16px", justifyContent: "space-between" }}>
-      <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, fontFamily: xpFont, color: "#fff" }}>📁 {title}</h1>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span style={{ fontSize: 11, opacity: 0.9 }}>{now}</span>
-        <div style={{ width: 8, height: 8, background: "#7CFF7C", borderRadius: "50%", boxShadow: "0 0 6px #7CFF7C", border: "1px solid #2a8a2a" }} />
-        <span style={{ fontSize: 11, opacity: 0.9 }}>Live</span>
+    <>
+      <header style={{ ...xpTitlebar, borderRadius: 0, padding: "8px 16px", justifyContent: "space-between" }}>
+        <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, fontFamily: xpFont, color: "#fff" }}>📁 {title}</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span className="zm-hide-mobile" style={{ fontSize: 11, opacity: 0.9 }}>{now}</span>
+          <div style={{ width: 8, height: 8, background: "#7CFF7C", borderRadius: "50%", boxShadow: "0 0 6px #7CFF7C", border: "1px solid #2a8a2a" }} />
+          <span style={{ fontSize: 11, opacity: 0.9 }}>Live</span>
+        </div>
+      </header>
+      <div style={{ background: "#d8d4c0", borderBottom: `1px solid ${T.border}`, padding: "3px 16px", textAlign: "right", fontSize: 10, color: "#5A5A5A", fontFamily: xpFont }}>
+        v{APP_VERSION} · ©2026 SRISP
       </div>
-    </header>
+    </>
   );
 }
 
@@ -251,7 +265,7 @@ function InspectionForm({ inspection, setInspection }) {
 function InventarisView({ cars, setCars }) {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
-  const blank = { brand: "", model: "", type: "SUV", priceBeli: "", price: "", year: new Date().getFullYear(), km: 0, status: "Ready", showInHero: false, color: "", transmission: "Otomatis", fuel: "Bensin", noRangka: "", noMesin: "", desc: "", images: [], inspection: defaultInspection() };
+  const blank = { brand: "", model: "", type: "SUV", priceBeli: "", price: "", year: new Date().getFullYear(), km: 0, status: "Ready", showInHero: false, color: "", transmission: "Otomatis", fuel: "Bensin", noRangka: "", noMesin: "", noPolisi: "", desc: "", images: [], inspection: defaultInspection() };
   const [form, setForm] = useState(blank);
   const [dragOver, setDragOver] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -398,7 +412,7 @@ function InventarisView({ cars, setCars }) {
             {/* Identitas kendaraan */}
             <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10, fontWeight: 700 }}>Identitas Kendaraan</div>
             <div className="zm-form-grid2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
-              {[["brand", "Merek *", "Toyota"], ["model", "Model *", "Fortuner GR Sport"], ["noRangka", "No. Rangka", "MHFXX1234K567890"], ["noMesin", "No. Mesin", "2GD-FTV-88321"], ["color", "Warna", "Hitam Metalik"], ["year", "Tahun", "2024"], ["km", "Kilometer", "8200"]].map(([key, label, ph]) => (
+              {[["brand", "Merek *", "Toyota"], ["model", "Model *", "Fortuner GR Sport"], ["noRangka", "No. Rangka", "MHFXX1234K567890"], ["noMesin", "No. Mesin", "2GD-FTV-88321"], ["noPolisi", "No. Polisi", "B 1234 ABC"], ["color", "Warna", "Hitam Metalik"], ["year", "Tahun", "2024"], ["km", "Kilometer", "8200"]].map(([key, label, ph]) => (
                 <div key={key}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
                   <input style={inp} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={ph} /></div>
               ))}
@@ -685,11 +699,12 @@ function LoginScreen({ onLoginSuccess }) {
     <div style={{ background: "linear-gradient(180deg, #5A8FD6 0%, #2A5DA8 50%, #7CB0E8 100%)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: xpFont, padding: 20 }}>
       <form onSubmit={handleLogin} style={{ background: "#ECE9D8", border: "1px solid #0A3E9E", borderRadius: 8, padding: 0, width: "100%", maxWidth: 360, boxSizing: "border-box", boxShadow: "3px 3px 14px rgba(0,0,0,0.4)", overflow: "hidden" }}>
         <div style={{ ...xpTitlebar, borderRadius: "7px 7px 0 0", padding: "7px 10px" }}>
-          <div style={{ width: 18, height: 18, background: T.gold, border: "1px solid #8a6d1f", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#000", fontSize: 10 }}>Z</div>
+          <img src="/adminzahramobil/logo.png" alt="ZM Showroom" style={{ height: 16, width: "auto" }} />
           <span>Log On to Zahra Mobil Admin</span>
         </div>
         <div style={{ padding: "24px 28px" }}>
           <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <img src="/adminzahramobil/logo.png" alt="ZM Showroom" style={{ height: 56, width: "auto", marginBottom: 8 }} />
             <div style={{ fontWeight: 700, fontSize: 15, color: "#0A3E9E" }}>ZAHRA MOBIL <span style={{ color: T.muted, fontWeight: 400 }}>ADMIN</span></div>
           </div>
           <div style={{ marginBottom: 12 }}>
@@ -766,14 +781,17 @@ export default function ZahraMobilAdmin() {
         * { box-sizing: border-box; }
         html, body { overflow-x: hidden; max-width: 100vw; background: #ECE9D8; }
         img { max-width: 100%; }
+        .zm-sidebar-icon-only { display: none; }
         @media (max-width: 820px) {
           .zm-sidebar { width: 64px !important; }
           .zm-sidebar .zm-sidebar-label { display: none !important; }
+          .zm-sidebar .zm-sidebar-icon-only { display: inline !important; font-size: 16px; }
           .zm-main-content { margin-left: 64px !important; }
           .zm-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .zm-dash-grid { grid-template-columns: 1fr !important; }
           .zm-fin-grid { grid-template-columns: 1fr !important; }
           .zm-form-grid3 { grid-template-columns: 1fr 1fr !important; }
+          .zm-hide-mobile { display: none !important; }
         }
         @media (max-width: 480px) {
           .zm-stat-grid { grid-template-columns: 1fr !important; }
