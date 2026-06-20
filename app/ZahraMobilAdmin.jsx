@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.8.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 
@@ -80,7 +80,7 @@ const NAV = [
 
 function Sidebar({ active, setActive, onLogout }) {
   return (
-    <aside className="zm-sidebar" style={{ width: 220, background: "linear-gradient(180deg, #2A6EBB 0%, #1B4F91 100%)", borderRight: "2px solid #0A3E9E", display: "flex", flexDirection: "column", minHeight: "100vh", position: "fixed", top: 0, left: 0, zIndex: 100, fontFamily: xpFont, overflow: "hidden" }}>
+    <aside className="zm-sidebar" style={{ width: 220, background: "linear-gradient(180deg, #2A6EBB 0%, #1B4F91 100%)", borderRight: "2px solid #0A3E9E", display: "flex", flexDirection: "column", position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 100, fontFamily: xpFont, overflow: "hidden" }}>
       <div style={{ ...xpTitlebar, borderRadius: 0, padding: "8px 12px" }}>
         <img src="/adminzahramobil/logo.png" alt="ZM Showroom" style={{ height: 24, width: "auto", flexShrink: 0, objectFit: "contain" }} />
         <div className="zm-sidebar-label" style={{ lineHeight: 1.2 }}><div style={{ fontSize: 13 }}>ZAHRA MOBIL</div><div style={{ fontSize: 9, opacity: 0.85, fontWeight: 400 }}>ADMIN PANEL</div></div>
@@ -205,11 +205,11 @@ function DashboardView({ cars, orders, transactions }) {
         </div>
       </div>
 
-      <div style={{ ...card, padding: "24px 28px" }}>
+      <div style={{ ...card, padding: "24px 28px", overflowX: "auto" }}>
         <div style={{ color: T.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 20 }}>Pesanan Terbaru</div>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 600 }}>
           <thead><tr>{["Nama", "No. HP", "Unit", "Metode", "Stage", "Waktu"].map(h => (
-            <th key={h} style={{ textAlign: "left", color: T.muted, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", paddingBottom: 12, borderBottom: `1px solid ${T.border}` }}>{h}</th>
+            <th key={h} style={{ textAlign: "left", color: T.muted, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", paddingBottom: 12, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>{h}</th>
           ))}</tr></thead>
           <tbody>
             {orders.slice(0, 5).map(o => (
@@ -468,20 +468,20 @@ function InventarisView({ cars, setCars }) {
         </div>
       )}
 
-      <div style={{ ...card, overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div style={{ ...card, overflowX: "auto", overflowY: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 680 }}>
           <thead><tr style={{ borderBottom: `1px solid ${T.border}` }}>{["Foto", "Unit", "No. Rangka", "Harga Jual", "Profit Est.", "Status", "Hero", "Aksi"].map(h => (
-            <th key={h} style={{ textAlign: "left", color: T.muted, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", padding: "14px 16px" }}>{h}</th>
+            <th key={h} style={{ textAlign: "left", color: T.muted, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", padding: "14px 16px", whiteSpace: "nowrap" }}>{h}</th>
           ))}</tr></thead>
           <tbody>
             {cars.map(car => (
               <tr key={car.id} style={{ borderBottom: `1px solid ${T.border}22` }}>
                 <td style={{ padding: "12px 16px" }}><img src={car.images[0]} alt={car.model} style={{ width: 72, height: 48, objectFit: "cover", borderRadius: 6, display: "block" }} /></td>
                 <td style={{ padding: "12px 16px" }}>
-                  <div style={{ color: T.text, fontWeight: 600, fontSize: 14 }}>{car.brand} {car.model}</div>
-                  <div style={{ color: T.muted, fontSize: 12, marginTop: 2 }}>{car.type} · {car.color}</div>
+                  <div style={{ color: T.text, fontWeight: 600, fontSize: 14, textTransform: "uppercase" }}>{car.brand} {car.model}</div>
+                  <div style={{ color: T.muted, fontSize: 12, marginTop: 2, textTransform: "uppercase" }}>{car.type} · {car.color}</div>
                 </td>
-                <td style={{ padding: "12px 16px", color: T.muted, fontSize: 12, fontFamily: "monospace" }}>{car.noRangka || "—"}</td>
+                <td style={{ padding: "12px 16px", color: T.muted, fontSize: 12, fontFamily: "monospace", textTransform: "uppercase" }}>{car.noRangka || "—"}</td>
                 <td style={{ padding: "12px 16px", color: T.gold, fontWeight: 700, fontSize: 14 }}>{fmtShort(car.price)}</td>
                 <td style={{ padding: "12px 16px", color: T.green, fontWeight: 600, fontSize: 13 }}>{car.priceBeli ? fmtShort(car.price - car.priceBeli) : "—"}</td>
                 <td style={{ padding: "12px 16px" }}>
