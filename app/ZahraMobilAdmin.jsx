@@ -288,7 +288,7 @@ function InventarisView({ cars, setCars }) {
       }
       reset(); setShowForm(false);
     } catch (e) {
-      alert("Gagal menyimpan data. Silakan coba lagi.");
+      alert("Gagal menyimpan data: " + e.message);
     } finally {
       setSaving(false);
     }
