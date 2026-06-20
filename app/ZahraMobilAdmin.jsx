@@ -18,6 +18,7 @@ function defaultInspection() {
   return out;
 }
 
+const APP_VERSION = "1.5.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 
@@ -92,6 +93,9 @@ function Sidebar({ active, setActive, onLogout }) {
         <button onClick={onLogout} style={{ width: "100%", padding: "5px", ...xpBtn(false), fontSize: 11.5, cursor: "pointer" }}>
           Keluar
         </button>
+        <div style={{ textAlign: "center", marginTop: 10, color: "#aecbed", fontSize: 9.5 }}>
+          v{APP_VERSION} · ©2026 SRISP
+        </div>
       </div>
     </aside>
   );
@@ -229,10 +233,10 @@ function InspectionForm({ inspection, setInspection }) {
           );
         })}
       </div>
-      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflow: "auto" }}>
+      <div style={{ background: "#f5f5f0", border: `1px solid ${T.border}`, borderRadius: 0, padding: 16, display: "flex", flexDirection: "column", gap: 6, maxHeight: 280, overflow: "auto" }}>
         {inspection[openCat].map((item, idx) => (
-          <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#171b24", borderRadius: 6 }}>
-            <span style={{ color: T.text, fontSize: 12.5, flex: 1 }}>{item.name}</span>
+          <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0 }}>
+            <span style={{ color: "#000", fontSize: 12.5, flex: 1 }}>{item.name}</span>
             <select value={item.status} onChange={e => updateItem(openCat, idx, "status", e.target.value)} style={{ background: `${statusColor[item.status]}22`, color: statusColor[item.status], border: "none", borderRadius: 5, padding: "4px 8px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
               {["OK", "Minor", "Perlu Perhatian"].map(s => <option key={s} value={s} style={{ background: T.card, color: T.text }}>{s}</option>)}
             </select>
@@ -257,26 +261,55 @@ function InventarisView({ cars, setCars }) {
   const reset = () => { setForm(blank); setEditId(null); };
   const handleEdit = (car) => { setForm({ ...car }); setEditId(car.id); setShowForm(true); };
 
+  const [uploadProgress, setUploadProgress] = useState({});
+
+  const uploadOneFile = (file) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const data = new FormData();
+      data.append("file", file);
+      data.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+      xhr.timeout = 20000; // 20 detik, supaya tidak macet selamanya
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          setUploadProgress(prev => ({ ...prev, [file.name]: pct }));
+        }
+      };
+      xhr.onload = () => {
+        try {
+          const json = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300 && json.secure_url) {
+            resolve(json.secure_url);
+          } else {
+            reject(new Error(json.error?.message || `Status ${xhr.status}`));
+          }
+        } catch (e) {
+          reject(new Error("Respons tidak valid dari server"));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Gagal terhubung ke server (cek koneksi internet)"));
+      xhr.ontimeout = () => reject(new Error("Waktu unggah habis (20 detik). Coba foto lebih kecil atau cek koneksi"));
+
+      xhr.open("POST", `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`);
+      xhr.send(data);
+    });
+  };
+
   const uploadFiles = async (fileList) => {
     const files = Array.from(fileList).filter(f => f.type.startsWith("image/"));
     if (files.length === 0) return;
     setUploadingCount(c => c + files.length);
     for (const file of files) {
       try {
-        const data = new FormData();
-        data.append("file", file);
-        data.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-          method: "POST",
-          body: data,
-        });
-        const json = await res.json();
-        if (!json.secure_url) throw new Error(json.error?.message || "Upload gagal");
-        setForm(prev => ({ ...prev, images: [...prev.images, json.secure_url] }));
+        const url = await uploadOneFile(file);
+        setForm(prev => ({ ...prev, images: [...prev.images, url] }));
       } catch (e) {
         alert(`Gagal mengunggah foto "${file.name}": ${e.message}`);
       } finally {
         setUploadingCount(c => c - 1);
+        setUploadProgress(prev => { const p = { ...prev }; delete p[file.name]; return p; });
       }
     }
   };
@@ -314,7 +347,7 @@ function InventarisView({ cars, setCars }) {
     uploadFiles(e.dataTransfer.files);
   }, []);
 
-  const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+  const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box", textTransform: "uppercase" };
 
   return (
     <div style={{ padding: 28 }}>
@@ -337,7 +370,14 @@ function InventarisView({ cars, setCars }) {
               onClick={() => fileRef.current.click()}>
               <input ref={fileRef} type="file" multiple accept="image/*" style={{ display: "none" }} onChange={e => uploadFiles(e.target.files)} />
               {uploadingCount > 0 && (
-                <div style={{ color: T.accent, fontSize: 12, fontWeight: 700, marginBottom: 10 }}>⏳ Mengunggah {uploadingCount} foto...</div>
+                <div style={{ marginBottom: 10 }}>
+                  {Object.entries(uploadProgress).map(([name, pct]) => (
+                    <div key={name} style={{ color: T.accent, fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>⏳ {name}: {pct}%</div>
+                  ))}
+                  {uploadingCount > 0 && Object.keys(uploadProgress).length === 0 && (
+                    <div style={{ color: T.accent, fontSize: 12, fontWeight: 700 }}>⏳ Mempersiapkan unggah {uploadingCount} foto...</div>
+                  )}
+                </div>
               )}
               {form.images.length > 0 ? (
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
@@ -534,7 +574,7 @@ function FinanceView({ transactions, setTransactions, cars }) {
     }
   };
 
-  const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+  const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box", textTransform: "uppercase" };
   const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun"];
   const mockMonthly = [820, 1150, 690, 1420, 1680, pemasukan / 1e6];
   const maxVal = Math.max(...mockMonthly);
@@ -661,6 +701,9 @@ function LoginScreen({ onLoginSuccess }) {
           <button type="submit" disabled={loading} style={{ width: "100%", padding: "8px", ...xpBtn(true), fontWeight: 700, fontSize: 13, cursor: loading ? "default" : "pointer" }}>
             {loading ? "Memproses..." : "Masuk ▸"}
           </button>
+          <div style={{ textAlign: "center", marginTop: 14, color: "#5A5A5A", fontSize: 10 }}>
+            v{APP_VERSION} · ©2026 SRISP
+          </div>
         </div>
       </form>
     </div>
