@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "1.9.0";
+const APP_VERSION = "2.0.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
@@ -508,7 +508,7 @@ function InventarisView({ cars, setCars }) {
 
       <div style={{ ...card, overflowX: "auto", overflowY: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 680 }}>
-          <thead><tr style={{ borderBottom: `1px solid ${T.border}` }}>{["Foto", "Unit", "No. Rangka", "Harga Jual", "Profit Est.", "Status", "Hero", "Aksi"].map(h => (
+          <thead><tr style={{ borderBottom: `1px solid ${T.border}` }}>{["Foto", "Unit", "No. Polisi", "Harga Jual", "Profit Est.", "Status", "Hero", "Aksi"].map(h => (
             <th key={h} style={{ textAlign: "left", color: T.muted, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", padding: "14px 16px", whiteSpace: "nowrap" }}>{h}</th>
           ))}</tr></thead>
           <tbody>
@@ -519,7 +519,7 @@ function InventarisView({ cars, setCars }) {
                   <div style={{ color: T.text, fontWeight: 600, fontSize: 14, textTransform: "uppercase" }}>{car.brand} {car.model}</div>
                   <div style={{ color: T.muted, fontSize: 12, marginTop: 2, textTransform: "uppercase" }}>{car.type} · {car.color}</div>
                 </td>
-                <td style={{ padding: "12px 16px", color: T.muted, fontSize: 12, fontFamily: "monospace", textTransform: "uppercase" }}>{car.noRangka || "—"}</td>
+                <td style={{ padding: "12px 16px", color: T.muted, fontSize: 12, fontFamily: "monospace", textTransform: "uppercase" }}>{car.noPolisi || "—"}</td>
                 <td style={{ padding: "12px 16px", color: T.gold, fontWeight: 700, fontSize: 14 }}>{fmtShort(car.price)}</td>
                 <td style={{ padding: "12px 16px", color: T.green, fontWeight: 600, fontSize: 13 }}>{car.priceBeli ? fmtShort(car.price - car.priceBeli) : "—"}</td>
                 <td style={{ padding: "12px 16px" }}>
