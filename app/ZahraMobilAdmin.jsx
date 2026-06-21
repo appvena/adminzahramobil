@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "2.8.0";
+const APP_VERSION = "2.9.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
@@ -83,6 +83,31 @@ const formatTimeAgo = (timestamp) => {
   if (diffHour < 24) return `${diffHour} jam lalu`;
   const diffDay = Math.floor(diffHour / 24);
   return `${diffDay} hari lalu`;
+};
+
+// Normalisasi nomor HP Indonesia ke format internasional untuk link wa.me
+// Menerima format: 08xxx, 8xxx, +62xxx, 62xxx -> selalu hasil: 62xxx
+const toWaNumber = (phone) => {
+  if (!phone) return "";
+  let n = String(phone).replace(/[^\d]/g, ""); // hapus semua karakter non-digit (spasi, -, +, dst)
+  if (n.startsWith("0")) n = "62" + n.slice(1);
+  else if (!n.startsWith("62")) n = "62" + n;
+  return n;
+};
+
+// Template email follow-up dari showroom
+const mailtoLink = (order) => {
+  const subject = `Mengenai Pesanan ${order.unit || "Kendaraan"} - Zahra Mobil`;
+  const body = `Halo ${order.nama || ""},
+
+Terima kasih telah menghubungi Zahra Mobil mengenai ${order.unit || "kendaraan"}.
+
+Tim kami akan segera menindaklanjuti pesanan Anda. Jika ada pertanyaan, jangan ragu untuk membalas email ini atau menghubungi kami via WhatsApp.
+
+Salam,
+Tim Zahra Mobil
+ZM Showroom`;
+  return `mailto:${order.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
 
 const T = {
@@ -788,7 +813,7 @@ function CRMView({ orders, setOrders }) {
                     style={{ background: dragging === o.id ? `${color}22` : "#fff", border: `1px solid ${dragging === o.id ? color : T.border}`, borderRadius: 8, padding: "12px 14px", cursor: "grab", opacity: dragging === o.id ? 0.7 : 1 }}>
                     <div style={{ color: T.text, fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{o.nama}</div>
                     <div style={{ color: T.muted, fontSize: 11, marginBottom: 4 }}>📱 {o.hp}</div>
-                    {o.email && <div style={{ color: T.muted, fontSize: 11, marginBottom: 6 }}>✉️ {o.email}</div>}
+                    {o.email && <a href={mailtoLink(o)} style={{ display: "block", color: T.accent, fontSize: 11, marginBottom: 6, textDecoration: "underline" }}>✉️ {o.email}</a>}
                     <div style={{ color, fontSize: 11, fontWeight: 600, marginBottom: 4 }}>🚗 {o.unit}</div>
                     <div style={{ color: T.muted, fontSize: 10.5, marginBottom: 8 }}>📍 {o.alamat}</div>
                     {o.ktp && (
@@ -803,7 +828,7 @@ function CRMView({ orders, setOrders }) {
                       {STAGES.map(s => <option key={s} value={s} style={{ background: "#fff", color: "#000" }}>➜ {s}</option>)}
                     </select>
                     <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
-                      <a href={`https://wa.me/${o.hp}`} target="_blank" rel="noreferrer" style={{ flex: 1, padding: "5px", background: "#25D36622", color: "#25D366", border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600, textAlign: "center", textDecoration: "none" }}>💬 WA</a>
+                      <a href={`https://wa.me/${toWaNumber(o.hp)}`} target="_blank" rel="noreferrer" style={{ flex: 1, padding: "5px", background: "#25D36622", color: "#25D366", border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600, textAlign: "center", textDecoration: "none" }}>💬 WA</a>
                       <button onClick={() => { if (window.confirm("Hapus pesanan ini?")) deleteDoc(doc(db, "orders", o.id)).catch(() => alert("Gagal menghapus.")); }} style={{ padding: "5px 8px", background: `${T.red}22`, color: T.red, border: "none", borderRadius: 5, fontSize: 11, cursor: "pointer" }}>✕</button>
                     </div>
                   </div>
