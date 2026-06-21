@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "2.5.0";
+const APP_VERSION = "2.6.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
@@ -123,6 +123,7 @@ const NAV = [
 ];
 
 function Sidebar({ active, setActive, onLogout }) {
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   return (
     <aside className="zm-sidebar" style={{ width: 220, background: "linear-gradient(180deg, #2A6EBB 0%, #1B4F91 100%)", borderRight: "2px solid #0A3E9E", display: "flex", flexDirection: "column", position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 100, fontFamily: xpFont, overflow: "hidden" }}>
       <div style={{ ...xpTitlebar, borderRadius: 0, padding: "8px 12px" }}>
@@ -145,11 +146,36 @@ function Sidebar({ active, setActive, onLogout }) {
           <div style={{ width: 28, height: 28, background: "#fff", border: "1px solid #0A3E9E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>👤</div>
           <div><div style={{ color: "#fff", fontSize: 11.5, fontWeight: 700 }}>Admin</div><div style={{ color: "#cfe0f7", fontSize: 10 }}>Super Admin</div></div>
         </div>
-        <button onClick={onLogout} title="Keluar" style={{ width: "100%", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "linear-gradient(180deg, #E8625B, #C42B1C)", border: "1px solid #8C1E13", borderRadius: 3, boxShadow: "inset 1px 1px 1px rgba(255,255,255,0.4)", color: "#fff", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+        <button onClick={() => setShowLogoutConfirm(true)} title="Keluar" style={{ width: "100%", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "linear-gradient(180deg, #E8625B, #C42B1C)", border: "1px solid #8C1E13", borderRadius: 3, boxShadow: "inset 1px 1px 1px rgba(255,255,255,0.4)", color: "#fff", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
           <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, border: "1px solid #fff", borderRadius: 2, fontSize: 10, fontWeight: 900, lineHeight: 1, flexShrink: 0 }}>✕</span>
           <span className="zm-sidebar-label">Keluar</span>
         </button>
       </div>
+
+      {showLogoutConfirm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={e => e.target === e.currentTarget && setShowLogoutConfirm(false)}>
+          <div style={{ background: "#ECE9D8", border: "2px solid #0A3E9E", borderRadius: 6, width: "100%", maxWidth: 340, boxShadow: "3px 3px 14px rgba(0,0,0,0.5)", overflow: "hidden", fontFamily: xpFont }}>
+            <div style={{ ...xpTitlebar, borderRadius: 0, padding: "6px 8px", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 12 }}>Keluar dari Sistem</span>
+              <button onClick={() => setShowLogoutConfirm(false)} style={{ background: "linear-gradient(180deg, #E8625B, #C42B1C)", border: "1px solid #8C1E13", color: "#fff", width: 20, height: 18, borderRadius: 2, cursor: "pointer", fontSize: 11, lineHeight: 1, fontWeight: 700 }}>✕</button>
+            </div>
+            <div style={{ padding: "22px 20px", display: "flex", gap: 16, alignItems: "flex-start" }}>
+              <div style={{ fontSize: 32, flexShrink: 0 }}>❓</div>
+              <div style={{ fontSize: 13, color: "#000", lineHeight: 1.5 }}>
+                Apakah Anda yakin ingin keluar dari Dashboard Admin?
+              </div>
+            </div>
+            <div style={{ padding: "0 20px 20px", display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => { setShowLogoutConfirm(false); onLogout(); }} style={{ padding: "7px 22px", ...xpBtn(true), fontWeight: 700, fontSize: 12.5, cursor: "pointer", minWidth: 80 }}>
+                Ya
+              </button>
+              <button onClick={() => setShowLogoutConfirm(false)} style={{ padding: "7px 22px", ...xpBtn(false), fontWeight: 600, fontSize: 12.5, cursor: "pointer", minWidth: 80 }}>
+                Tidak
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
@@ -748,7 +774,11 @@ function CRMView({ orders, setOrders }) {
                       <span style={{ background: `${color}22`, color, padding: "2px 6px", borderRadius: 4, fontSize: 10 }}>{o.metode}</span>
                       <span style={{ color: T.muted, fontSize: 10 }}>{o.time}</span>
                     </div>
-                    <div style={{ marginTop: 10, display: "flex", gap: 6 }}>
+                    <select value={o.stage} onChange={e => updateDoc(doc(db, "orders", o.id), { stage: e.target.value }).catch(() => alert("Gagal update status pesanan."))}
+                      style={{ width: "100%", marginTop: 8, padding: "5px 6px", fontSize: 10.5, fontWeight: 600, color, background: `${color}15`, border: `1px solid ${color}55`, borderRadius: 3, cursor: "pointer" }}>
+                      {STAGES.map(s => <option key={s} value={s} style={{ background: "#fff", color: "#000" }}>➜ {s}</option>)}
+                    </select>
+                    <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
                       <a href={`https://wa.me/${o.phone}`} target="_blank" rel="noreferrer" style={{ flex: 1, padding: "5px", background: "#25D36622", color: "#25D366", border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600, textAlign: "center", textDecoration: "none" }}>💬 WA</a>
                       <button onClick={() => { if (window.confirm("Hapus pesanan ini?")) deleteDoc(doc(db, "orders", o.id)).catch(() => alert("Gagal menghapus.")); }} style={{ padding: "5px 8px", background: `${T.red}22`, color: T.red, border: "none", borderRadius: 5, fontSize: 11, cursor: "pointer" }}>✕</button>
                     </div>
