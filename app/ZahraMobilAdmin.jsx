@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.3.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
@@ -485,14 +485,21 @@ function InventarisView({ cars, setCars }) {
                   {CAR_BRANDS.map(b => <option key={b} value={b} />)}
                 </datalist>
               </div>
-              {[["model", "Model *", "Fortuner GR Sport"], ["noRangka", "No. Rangka", "MHFXX1234K567890"], ["noMesin", "No. Mesin", "2GD-FTV-88321"], ["noPolisi", "No. Polisi", "B 1234 ABC"], ["color", "Warna", "Hitam Metalik"], ["year", "Tahun", "2024"], ["km", "Kilometer", "8200"]].map(([key, label, ph]) => (
+              <div>
+                <label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>Type *</label>
+                <input style={inp} list="zm-car-models" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="Ayla 1.0 X MT (B100RS-GMQFJ)" />
+                <datalist id="zm-car-models">
+                  {[...new Set(cars.map(c => c.model).filter(Boolean))].sort().map(m => <option key={m} value={m} />)}
+                </datalist>
+              </div>
+              {[["noRangka", "No. Rangka", "MHFXX1234K567890"], ["noMesin", "No. Mesin", "2GD-FTV-88321"], ["noPolisi", "No. Polisi", "B 1234 ABC"], ["color", "Warna", "Hitam Metalik"], ["year", "Tahun", "2024"], ["km", "Kilometer", "8200"]].map(([key, label, ph]) => (
                 <div key={key}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
                   <input style={inp} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={ph} /></div>
               ))}
             </div>
 
             <div className="zm-form-grid3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 18 }}>
-              {[["type", "Tipe", ["Sedan", "Hatchback", "MPV", "Station Wagon", "Coupe", "Convertible", "Sports Car", "Supercar", "Hypercar", "Crossover", "SUV", "Minibus", "Truk", "Pickup", "Double Cabin", "City Car", "Kei Car", "Limousine"]], ["transmission", "Transmisi", ["Otomatis", "Manual"]], ["fuel", "Bahan Bakar", ["Bensin", "Diesel", "Hybrid", "Listrik"]]].map(([key, label, opts]) => (
+              {[["type", "Model", ["Sedan", "Hatchback", "MPV", "Station Wagon", "Coupe", "Convertible", "Sports Car", "Supercar", "Hypercar", "Crossover", "SUV", "Minibus", "Truk", "Pickup", "Double Cabin", "City Car", "Kei Car", "Limousine"]], ["transmission", "Transmisi", ["Otomatis", "Manual"]], ["fuel", "Bahan Bakar", ["Bensin", "Diesel", "Hybrid", "Listrik"]]].map(([key, label, opts]) => (
                 <div key={key}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
                   <select style={inp} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}>{opts.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
               ))}
