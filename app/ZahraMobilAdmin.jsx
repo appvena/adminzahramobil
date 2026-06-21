@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.4.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
@@ -175,14 +175,14 @@ function Header({ title }) {
 
 function StatCard({ icon, label, value, sub, color }) {
   return (
-    <div style={{ ...card, padding: "16px 18px", fontFamily: xpFont }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ color: T.muted, fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6, fontWeight: 700 }}>{label}</div>
-          <div style={{ color: T.text, fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{value}</div>
-          {sub && <div style={{ color: color || T.muted, fontSize: 11 }}>{sub}</div>}
+    <div style={{ ...card, padding: "12px 14px", fontFamily: xpFont }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: T.muted, fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 4, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+          <div style={{ color: T.text, fontSize: 19, fontWeight: 700, marginBottom: 2 }}>{value}</div>
+          {sub && <div style={{ color: color || T.muted, fontSize: 9.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
         </div>
-        <div style={{ width: 38, height: 38, background: "#fff", border: `2px solid ${color || T.accent}`, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{icon}</div>
+        <div style={{ width: 28, height: 28, background: "#fff", border: `2px solid ${color || T.accent}`, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{icon}</div>
       </div>
     </div>
   );
@@ -339,6 +339,8 @@ function InventarisView({ cars, setCars }) {
 
   const reset = () => { setForm(blank); setEditId(null); };
   const handleEdit = (car) => { setForm({ ...car }); setEditId(car.id); setShowForm(true); };
+  const [viewCar, setViewCar] = useState(null);
+  const [viewActiveImg, setViewActiveImg] = useState(0);
 
   const [uploadProgress, setUploadProgress] = useState({});
 
@@ -577,6 +579,7 @@ function InventarisView({ cars, setCars }) {
                 </td>
                 <td style={{ padding: "12px 16px" }}>
                   <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => { setViewCar(car); setViewActiveImg(0); }} style={{ padding: "6px 12px", background: `${T.green}22`, color: T.green, border: "none", borderRadius: 5, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Lihat</button>
                     <button onClick={() => handleEdit(car)} style={{ padding: "6px 12px", background: `${T.accent}22`, color: T.accent, border: "none", borderRadius: 5, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Edit</button>
                     <button onClick={() => handleDelete(car.id)} style={{ padding: "6px 12px", background: `${T.red}22`, color: T.red, border: "none", borderRadius: 5, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Hapus</button>
                   </div>
@@ -586,6 +589,86 @@ function InventarisView({ cars, setCars }) {
           </tbody>
         </table>
       </div>
+
+      {viewCar && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={e => e.target === e.currentTarget && setViewCar(null)}>
+          <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 6, width: "94%", maxWidth: 720, maxHeight: "92vh", overflow: "auto", fontFamily: xpFont }}>
+            <div style={{ ...xpTitlebar, borderRadius: "5px 5px 0 0", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 5 }}>
+              <span>👁 Detail Unit — {viewCar.brand} {viewCar.model}</span>
+              <button onClick={() => setViewCar(null)} style={{ background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.4)", color: "#fff", width: 22, height: 20, borderRadius: 2, cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</button>
+            </div>
+
+            <div style={{ padding: 24 }}>
+              {/* Galeri foto */}
+              {viewCar.images && viewCar.images.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ position: "relative", paddingTop: "58%", borderRadius: 4, overflow: "hidden", background: "#000", border: `1px solid ${T.border}`, marginBottom: 8 }}>
+                    <img src={viewCar.images[viewActiveImg]} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+                  </div>
+                  {viewCar.images.length > 1 && (
+                    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+                      {viewCar.images.map((img, i) => (
+                        <button key={i} onClick={() => setViewActiveImg(i)} style={{ flexShrink: 0, width: 64, height: 44, padding: 0, border: `2px solid ${i === viewActiveImg ? T.accent : T.border}`, borderRadius: 3, cursor: "pointer", overflow: "hidden", background: "#000" }}>
+                          <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Status & harga */}
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
+                <span style={{ background: viewCar.status === "Ready" ? `${T.green}22` : viewCar.status === "Booking" ? `${T.amber}22` : "#e5e5e5", color: viewCar.status === "Ready" ? T.green : viewCar.status === "Booking" ? T.amber : T.muted, padding: "4px 12px", borderRadius: 3, fontSize: 12, fontWeight: 700 }}>{viewCar.status}</span>
+                <span style={{ color: T.gold, fontSize: 20, fontWeight: 700 }}>{fmt(viewCar.price)}</span>
+                {viewCar.priceBeli > 0 && <span style={{ color: T.green, fontSize: 12 }}>(Profit est. {fmt(viewCar.price - viewCar.priceBeli)})</span>}
+              </div>
+
+              {/* Spesifikasi */}
+              <div style={{ background: "#f5f5f0", border: `1px solid ${T.border}`, borderRadius: 4, padding: 16, marginBottom: 18 }}>
+                <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 10 }}>Spesifikasi</div>
+                {[["Merek", viewCar.brand], ["Type", viewCar.model], ["Model (Body)", viewCar.type], ["Tahun", viewCar.year], ["Kilometer", `${(viewCar.km || 0).toLocaleString("id-ID")} km`], ["Warna", viewCar.color], ["Transmisi", viewCar.transmission], ["Bahan Bakar", viewCar.fuel], ["No. Rangka", viewCar.noRangka], ["No. Mesin", viewCar.noMesin], ["No. Polisi", viewCar.noPolisi]].map(([label, val], i) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: i < 10 ? `1px solid ${T.border}66` : "none" }}>
+                    <span style={{ color: T.muted, fontSize: 12.5 }}>{label}</span>
+                    <span style={{ color: T.text, fontSize: 12.5, fontWeight: 600, textTransform: "uppercase" }}>{val || "—"}</span>
+                  </div>
+                ))}
+                {viewCar.desc && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                    <div style={{ color: T.muted, fontSize: 11, marginBottom: 4 }}>Deskripsi:</div>
+                    <div style={{ color: T.text, fontSize: 12.5 }}>{viewCar.desc}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Checklist inspeksi */}
+              {viewCar.inspection && (
+                <div style={{ background: "#f5f5f0", border: `1px solid ${T.border}`, borderRadius: 4, padding: 16 }}>
+                  <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 10 }}>Hasil Inspeksi</div>
+                  {INSPECTION_CATEGORIES.map(cat => (
+                    <div key={cat.key} style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: T.text, marginBottom: 6 }}>{cat.icon} {cat.label}</div>
+                      {(viewCar.inspection[cat.key] || []).map((item, i) => {
+                        const sc = { OK: T.green, Minor: T.amber, "Perlu Perhatian": T.red };
+                        return (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0 4px 10px", fontSize: 12 }}>
+                            <span style={{ color: T.muted }}>{item.name}</span>
+                            <span style={{ color: sc[item.status] || T.muted, fontWeight: 700 }}>{item.status}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button onClick={() => { setViewCar(null); handleEdit(viewCar); }} style={{ width: "100%", marginTop: 16, padding: "9px", ...xpBtn(true), fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                ✏️ Edit Unit Ini
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
