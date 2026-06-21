@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.8.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
@@ -72,6 +72,18 @@ const STAGE_SHORT = { "Pesanan Baru": "Baru", "Verifikasi Data": "Verifikasi", "
 const STATUS_OPTS = ["Ready", "Booking", "Terjual"];
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
+const formatTimeAgo = (timestamp) => {
+  if (!timestamp) return "—";
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "Baru saja";
+  if (diffMin < 60) return `${diffMin} menit lalu`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} jam lalu`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay} hari lalu`;
+};
 
 const T = {
   bg: "#ECE9D8",            // desktop/window background khas XP
@@ -313,7 +325,7 @@ function DashboardView({ cars, orders, transactions, storageMeta }) {
           <tbody>
             {orders.slice(0, 5).map(o => (
               <tr key={o.id} style={{ borderBottom: `1px solid ${T.border}22` }}>
-                {[o.name, o.phone, o.unit, <span style={{ color: T.accent, fontSize: 11 }}>{o.metode}</span>, <span style={{ background: `${T.amber}22`, color: T.amber, padding: "2px 8px", borderRadius: 4, fontSize: 11 }}>{STAGE_SHORT[o.stage]}</span>, <span style={{ color: T.muted }}>{o.time}</span>].map((val, j) => (
+                {[o.nama, o.hp, o.unit, <span style={{ color: T.accent, fontSize: 11 }}>{o.metode}</span>, <span style={{ background: `${T.amber}22`, color: T.amber, padding: "2px 8px", borderRadius: 4, fontSize: 11 }}>{STAGE_SHORT[o.stage]}</span>, <span style={{ color: T.muted }}>{formatTimeAgo(o.createdAt)}</span>].map((val, j) => (
                   <td key={j} style={{ padding: "12px 0", paddingRight: 16, color: T.text, fontSize: 13 }}>{val}</td>
                 ))}
               </tr>
@@ -415,8 +427,15 @@ function InventarisView({ cars, setCars }) {
     });
   };
 
+  const MAX_FILE_SIZE_MB = 10;
+
   const uploadFiles = async (fileList) => {
-    const files = Array.from(fileList).filter(f => f.type.startsWith("image/"));
+    const allFiles = Array.from(fileList);
+    const oversized = allFiles.filter(f => f.size > MAX_FILE_SIZE_MB * 1024 * 1024);
+    if (oversized.length > 0) {
+      alert(`File berikut terlalu besar (maks ${MAX_FILE_SIZE_MB}MB):\n${oversized.map(f => `• ${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB)`).join("\n")}`);
+    }
+    const files = allFiles.filter(f => f.type.startsWith("image/") && f.size <= MAX_FILE_SIZE_MB * 1024 * 1024);
     if (files.length === 0) return;
     setUploadingCount(c => c + files.length);
     for (const file of files) {
@@ -435,9 +454,13 @@ function InventarisView({ cars, setCars }) {
 
   const handleSave = async () => {
     if (!form.brand || !form.model || !form.price) return alert("Brand, Model, dan Harga Jual wajib diisi.");
+    const priceNum = Number(form.price);
+    const priceBeliNum = Number(form.priceBeli || 0);
+    if (isNaN(priceNum) || priceNum <= 0) return alert("Harga Jual harus berupa angka yang valid dan lebih dari 0.");
+    if (form.priceBeli && (isNaN(priceBeliNum) || priceBeliNum < 0)) return alert("Harga Beli harus berupa angka yang valid.");
     setSaving(true);
     try {
-      const payload = { ...form, price: Number(form.price), priceBeli: Number(form.priceBeli || 0), images: form.images.length ? form.images : ["https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&q=75"] };
+      const payload = { ...form, price: priceNum, priceBeli: priceBeliNum, images: form.images.length ? form.images : ["https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&q=75"] };
       delete payload.id;
       if (editId) {
         await updateDoc(doc(db, "cars", editId), payload);
@@ -763,8 +786,9 @@ function CRMView({ orders, setOrders }) {
                 {stageOrders.map(o => (
                   <div key={o.id} draggable onDragStart={() => setDragging(o.id)} onDragEnd={() => { setDragging(null); setOver(null); }}
                     style={{ background: dragging === o.id ? `${color}22` : "#fff", border: `1px solid ${dragging === o.id ? color : T.border}`, borderRadius: 8, padding: "12px 14px", cursor: "grab", opacity: dragging === o.id ? 0.7 : 1 }}>
-                    <div style={{ color: T.text, fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{o.name}</div>
-                    <div style={{ color: T.muted, fontSize: 11, marginBottom: 6 }}>📱 {o.phone}</div>
+                    <div style={{ color: T.text, fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{o.nama}</div>
+                    <div style={{ color: T.muted, fontSize: 11, marginBottom: 4 }}>📱 {o.hp}</div>
+                    {o.email && <div style={{ color: T.muted, fontSize: 11, marginBottom: 6 }}>✉️ {o.email}</div>}
                     <div style={{ color, fontSize: 11, fontWeight: 600, marginBottom: 4 }}>🚗 {o.unit}</div>
                     <div style={{ color: T.muted, fontSize: 10.5, marginBottom: 8 }}>📍 {o.alamat}</div>
                     {o.ktp && (
@@ -772,14 +796,14 @@ function CRMView({ orders, setOrders }) {
                     )}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ background: `${color}22`, color, padding: "2px 6px", borderRadius: 4, fontSize: 10 }}>{o.metode}</span>
-                      <span style={{ color: T.muted, fontSize: 10 }}>{o.time}</span>
+                      <span style={{ color: T.muted, fontSize: 10 }}>{formatTimeAgo(o.createdAt)}</span>
                     </div>
                     <select value={o.stage} onChange={e => updateDoc(doc(db, "orders", o.id), { stage: e.target.value }).catch(() => alert("Gagal update status pesanan."))}
                       style={{ width: "100%", marginTop: 8, padding: "5px 6px", fontSize: 10.5, fontWeight: 600, color, background: `${color}15`, border: `1px solid ${color}55`, borderRadius: 3, cursor: "pointer" }}>
                       {STAGES.map(s => <option key={s} value={s} style={{ background: "#fff", color: "#000" }}>➜ {s}</option>)}
                     </select>
                     <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
-                      <a href={`https://wa.me/${o.phone}`} target="_blank" rel="noreferrer" style={{ flex: 1, padding: "5px", background: "#25D36622", color: "#25D366", border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600, textAlign: "center", textDecoration: "none" }}>💬 WA</a>
+                      <a href={`https://wa.me/${o.hp}`} target="_blank" rel="noreferrer" style={{ flex: 1, padding: "5px", background: "#25D36622", color: "#25D366", border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600, textAlign: "center", textDecoration: "none" }}>💬 WA</a>
                       <button onClick={() => { if (window.confirm("Hapus pesanan ini?")) deleteDoc(doc(db, "orders", o.id)).catch(() => alert("Gagal menghapus.")); }} style={{ padding: "5px 8px", background: `${T.red}22`, color: T.red, border: "none", borderRadius: 5, fontSize: 11, cursor: "pointer" }}>✕</button>
                     </div>
                   </div>
