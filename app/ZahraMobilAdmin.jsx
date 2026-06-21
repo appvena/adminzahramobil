@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.2.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
@@ -37,6 +37,34 @@ async function recordStorageUsage(bytes) {
     console.error("Gagal mencatat penggunaan storage:", e);
   }
 }
+
+const CAR_BRANDS = [
+  "Abarth", "Acura", "Afeela", "Aion", "AITO", "Aiways", "Alfa Romeo", "Alpina", "Alpine", "Apollo Automobil", "Arcfox", "Ariel", "Aston Martin", "Audi", "Avatr",
+  "BAIC", "Baojun", "BAW", "Bentley", "Bestune", "BMW", "Bollinger", "Brabus", "Bugatti", "Buick", "BYD",
+  "Cadillac", "Caterham", "Changan", "Chery", "Chevrolet", "Chrysler", "Citroën", "Cupra",
+  "Dacia", "DAF", "Daihatsu", "Dallara", "Deepal", "Denza", "DFSK", "Dodge", "Dongfeng", "DS Automobiles",
+  "Esemka", "Exeed",
+  "Fangchengbao", "Farizon", "FAW", "Ferrari", "Fiat", "Fisker", "Ford", "Foton", "Forthing",
+  "GAZ", "Geely", "Genesis", "GMC", "GWM",
+  "Haval", "Hennessey", "Hino", "Hongqi", "Honda", "Hyundai", "Hyptec",
+  "iCar", "IM Motors", "Ineos Automotive", "Infiniti", "Isuzu", "Iveco",
+  "JAC Motors", "Jaecoo", "Jaguar", "Jeep", "Jetour", "Ji Yue", "JMC",
+  "Karma Automotive", "KG Mobility", "Kia", "Koenigsegg", "KTM",
+  "Lada", "Lamborghini", "Lancia", "Land Rover", "Leapmotor", "Lexus", "Li Auto", "Lincoln", "Lotus", "Lucid Motors", "Luxeed", "Luxgen", "Lynk & Co",
+  "M-Hero", "Maextro", "Mahindra", "MAN", "Maruti Suzuki", "Maserati", "Maxus", "Maybach", "Mazda", "McLaren", "Mercedes-Benz", "MG", "MINI", "Mitsubishi", "Mitsuoka", "Morgan",
+  "Nammi", "Neta", "Nevo", "NIO", "Nissan", "Noble",
+  "Omoda", "Opel", "Ora",
+  "Pagani", "Perodua", "Peugeot", "Pindad", "Pininfarina", "Polestar", "Porsche", "Proton",
+  "Radical", "Ram", "Renault", "Rezvani", "Riddara", "Rimac", "Rising Auto", "Rolls-Royce",
+  "SAIC", "Saleen", "Scania", "Scout Motors", "SEAT", "Seres", "Shelby", "Skoda", "Smart", "Soueast", "SSC North America", "Stelato", "Subaru", "Suzuki",
+  "Tank", "Tata Motors", "Tesla", "Toyota", "Trumpchi", "TVR",
+  "UAZ", "UD Trucks",
+  "VinFast", "Volkswagen", "Volvo", "Voyah",
+  "Wey", "Wuling",
+  "Xiaomi", "XPENG",
+  "Yangwang",
+  "Zeekr", "Zenvo",
+];
 
 const STAGES = ["Pesanan Baru", "Verifikasi Data", "Proses Leasing/Pelunasan", "Penyiapan Towing", "Mobil Terkirim"];
 const STAGE_SHORT = { "Pesanan Baru": "Baru", "Verifikasi Data": "Verifikasi", "Proses Leasing/Pelunasan": "Leasing/Lunas", "Penyiapan Towing": "Towing", "Mobil Terkirim": "Terkirim" };
@@ -450,7 +478,14 @@ function InventarisView({ cars, setCars }) {
             {/* Identitas kendaraan */}
             <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10, fontWeight: 700 }}>Identitas Kendaraan</div>
             <div className="zm-form-grid2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
-              {[["brand", "Merek *", "Toyota"], ["model", "Model *", "Fortuner GR Sport"], ["noRangka", "No. Rangka", "MHFXX1234K567890"], ["noMesin", "No. Mesin", "2GD-FTV-88321"], ["noPolisi", "No. Polisi", "B 1234 ABC"], ["color", "Warna", "Hitam Metalik"], ["year", "Tahun", "2024"], ["km", "Kilometer", "8200"]].map(([key, label, ph]) => (
+              <div>
+                <label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>Merek *</label>
+                <input style={inp} list="zm-car-brands" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="Toyota (ketik untuk cari, atau isi manual)" />
+                <datalist id="zm-car-brands">
+                  {CAR_BRANDS.map(b => <option key={b} value={b} />)}
+                </datalist>
+              </div>
+              {[["model", "Model *", "Fortuner GR Sport"], ["noRangka", "No. Rangka", "MHFXX1234K567890"], ["noMesin", "No. Mesin", "2GD-FTV-88321"], ["noPolisi", "No. Polisi", "B 1234 ABC"], ["color", "Warna", "Hitam Metalik"], ["year", "Tahun", "2024"], ["km", "Kilometer", "8200"]].map(([key, label, ph]) => (
                 <div key={key}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
                   <input style={inp} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={ph} /></div>
               ))}
