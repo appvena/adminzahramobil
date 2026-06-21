@@ -18,10 +18,130 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "2.9.0";
+const APP_VERSION = "3.0.0";
+const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
+const GUEST_SITE_URL = "https://appvena.github.io/zahramobil";
+const SHOWROOM_INFO = {
+  nama: "Zahra Mobil",
+  alamat: "Jl. Dr. Mr. Mohd Hasan, Batoh, Kec. Lueng Bata, Kota Banda Aceh",
+  telepon: "0811-6707-099",
+};
+
+// Loader script CDN dinamis - dipanggil sekali, di-cache supaya tidak load ulang
+const scriptCache = {};
+function loadScript(src, globalCheck) {
+  if (typeof window !== "undefined" && window[globalCheck]) return Promise.resolve();
+  if (scriptCache[src]) return scriptCache[src];
+  scriptCache[src] = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error(`Gagal memuat library dari ${src}`));
+    document.head.appendChild(s);
+  });
+  return scriptCache[src];
+}
+
+// Generate kwitansi PDF dengan logo showroom + QR code menuju halaman detail mobil
+async function generateKwitansiPDF(tx, car) {
+  await loadScript("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js", "PDFLib");
+  await loadScript("https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js", "QRCode");
+
+  const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([420, 595]); // ukuran setengah A4, mirip struk/kwitansi formal
+  const { width, height } = page.getSize();
+  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  const gold = rgb(0.79, 0.66, 0.30);
+  const dark = rgb(0.16, 0.16, 0.16);
+  const muted = rgb(0.45, 0.45, 0.45);
+  let y = height - 40;
+
+  // Header: logo + nama showroom
+  try {
+    const logoRes = await fetch("/adminzahramobil/logo.png");
+    const logoBytes = await logoRes.arrayBuffer();
+    const logoImg = await pdfDoc.embedPng(logoBytes);
+    const logoDims = logoImg.scale(40 / logoImg.height);
+    page.drawImage(logoImg, { x: 40, y: y - 30, width: logoDims.width, height: 40 });
+  } catch (e) { /* logo opsional, lanjut tanpa logo kalau gagal */ }
+
+  page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: 95, y: y - 8, size: 16, font: fontBold, color: dark });
+  page.drawText(SHOWROOM_INFO.alamat, { x: 95, y: y - 22, size: 7.5, font: fontRegular, color: muted, maxWidth: 280 });
+  page.drawText(`Telp/WA: ${SHOWROOM_INFO.telepon}`, { x: 95, y: y - 33, size: 7.5, font: fontRegular, color: muted });
+
+  y -= 60;
+  page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 1.5, color: gold });
+  y -= 26;
+
+  page.drawText("KWITANSI PEMBAYARAN", { x: 40, y, size: 14, font: fontBold, color: dark });
+  y -= 18;
+  const txDate = tx.date ? new Date(tx.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-";
+  page.drawText(`No. Kwitansi: ${tx.id?.slice(0, 8).toUpperCase() || "—"}   |   Tanggal: ${txDate}`, { x: 40, y, size: 8.5, font: fontRegular, color: muted });
+  y -= 30;
+
+  const row = (label, value, bold = false) => {
+    page.drawText(label, { x: 40, y, size: 9.5, font: fontRegular, color: muted });
+    page.drawText(String(value || "—"), { x: 170, y, size: 9.5, font: bold ? fontBold : fontRegular, color: dark, maxWidth: 210 });
+    y -= 18;
+  };
+
+  row("Jenis Transaksi", `${tx.category} — ${tx.type}`);
+  row("Keterangan", tx.notes);
+  y -= 6;
+
+  if (car) {
+    page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) });
+    y -= 18;
+    page.drawText("DATA KENDARAAN", { x: 40, y, size: 10, font: fontBold, color: gold });
+    y -= 18;
+    row("Unit", `${car.brand || ""} ${car.model || ""}`.toUpperCase());
+    row("No. Polisi", car.noPolisi);
+    row("Tahun / Warna", `${car.year || "—"} / ${car.color || "—"}`);
+    row("Harga Unit", fmt(car.price || 0), true);
+  }
+
+  y -= 10;
+  page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 1.5, color: gold });
+  y -= 26;
+
+  page.drawText("JUMLAH DIBAYAR", { x: 40, y, size: 11, font: fontBold, color: dark });
+  page.drawText(fmt(tx.amount || 0), { x: 40, y: y - 18, size: 18, font: fontBold, color: gold });
+
+  // QR Code di kanan bawah, mengarah ke halaman detail mobil di Web Tamu
+  if (car) {
+    try {
+      const qrUrl = `${GUEST_SITE_URL}/?car=${car.id}`;
+      const qrDataUrl = await window.QRCode.toDataURL(qrUrl, { width: 240, margin: 0 });
+      const qrBytes = await fetch(qrDataUrl).then(r => r.arrayBuffer());
+      const qrImg = await pdfDoc.embedPng(qrBytes);
+      const qrSize = 90;
+      page.drawImage(qrImg, { x: width - 40 - qrSize, y: 70, width: qrSize, height: qrSize });
+      page.drawText("Scan untuk lihat unit", { x: width - 40 - qrSize, y: 58, size: 7, font: fontRegular, color: muted });
+    } catch (e) { /* QR opsional, lanjut tanpa QR kalau gagal */ }
+  }
+
+  page.drawLine({ start: { x: 40, y: 50 }, end: { x: width - 40, y: 50 }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) });
+  page.drawText("Terima kasih atas kepercayaan Anda kepada Zahra Mobil.", { x: 40, y: 36, size: 7.5, font: fontRegular, color: muted });
+  page.drawText(`Dicetak otomatis oleh sistem · v${APP_VERSION}`, { x: 40, y: 26, size: 6.5, font: fontRegular, color: muted });
+
+  const pdfBytes = await pdfDoc.save();
+  const blob = new Blob([pdfBytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Kwitansi_${(car ? car.noPolisi : tx.id) || "transaksi"}.pdf`.replace(/\s/g, "_");
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
 
 // Catat estimasi pemakaian storage ke Firestore (collection "meta", dokumen "storage").
 // Ini PERKIRAAN berdasarkan ukuran file yang diupload, bukan angka resmi dari Cloudinary,
@@ -70,8 +190,6 @@ const STAGES = ["Pesanan Baru", "Verifikasi Data", "Proses Leasing/Pelunasan", "
 const STAGE_SHORT = { "Pesanan Baru": "Baru", "Verifikasi Data": "Verifikasi", "Proses Leasing/Pelunasan": "Leasing/Lunas", "Penyiapan Towing": "Towing", "Mobil Terkirim": "Terkirim" };
 
 const STATUS_OPTS = ["Ready", "Booking", "Terjual"];
-const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
-const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 const formatTimeAgo = (timestamp) => {
   if (!timestamp) return "—";
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -858,7 +976,7 @@ function CRMView({ orders, setOrders }) {
 
 // ─── FINANCE ─────────────────────────────────────────────────────────────────
 function FinanceView({ transactions, setTransactions, cars }) {
-  const [form, setForm] = useState({ type: "DP", amount: "", date: new Date().toISOString().split("T")[0], notes: "", category: "Pemasukan", carId: "" });
+  const [form, setForm] = useState({ type: "DP", amount: "", date: new Date().toISOString().split("T")[0], notes: "", category: "Pemasukan", carId: "", carPlateSearch: "" });
 
   const pemasukan = transactions.filter(t => t.category === "Pemasukan").reduce((s, t) => s + t.amount, 0);
   const pengeluaran = transactions.filter(t => t.category === "Pengeluaran").reduce((s, t) => s + t.amount, 0);
@@ -869,8 +987,9 @@ function FinanceView({ transactions, setTransactions, cars }) {
   const handleAdd = async () => {
     if (!form.amount || !form.notes) return alert("Jumlah dan keterangan wajib diisi.");
     try {
-      await addDoc(collection(db, "transactions"), { ...form, amount: Number(form.amount) });
-      setForm(f => ({ ...f, amount: "", notes: "", carId: "" }));
+      const { carPlateSearch, ...payload } = form;
+      await addDoc(collection(db, "transactions"), { ...payload, amount: Number(form.amount) });
+      setForm(f => ({ ...f, amount: "", notes: "", carId: "", carPlateSearch: "" }));
     } catch (e) {
       alert("Gagal menyimpan transaksi.");
     }
@@ -904,8 +1023,35 @@ function FinanceView({ transactions, setTransactions, cars }) {
             <select style={inp} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>{["DP", "Pelunasan", "Pencairan Leasing", "Operasional", "Lainnya"].map(o => <option key={o} value={o}>{o}</option>)}</select></div>
           <div style={{ marginBottom: 12 }}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Tanggal</label>
             <input type="date" style={inp} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
-          <div style={{ marginBottom: 12 }}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Unit Terkait (opsional)</label>
-            <select style={inp} value={form.carId} onChange={e => setForm(f => ({ ...f, carId: e.target.value }))}><option value="">— Tidak ada —</option>{cars.map(c => <option key={c.id} value={c.id}>{c.brand} {c.model}</option>)}</select></div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Cari Unit (No. Polisi)</label>
+            <input style={inp} list="zm-tx-car-plates" value={form.carPlateSearch || ""} placeholder="Ketik No. Polisi, contoh: BK1247AB"
+              onChange={e => {
+                const val = e.target.value;
+                const matched = cars.find(c => (c.noPolisi || "").toUpperCase().replace(/\s/g, "") === val.toUpperCase().replace(/\s/g, ""));
+                setForm(f => ({ ...f, carPlateSearch: val, carId: matched ? matched.id : "" }));
+              }} />
+            <datalist id="zm-tx-car-plates">
+              {cars.filter(c => c.noPolisi).map(c => <option key={c.id} value={c.noPolisi} />)}
+            </datalist>
+            {form.carId && (() => {
+              const selected = cars.find(c => c.id === form.carId);
+              if (!selected) return null;
+              return (
+                <div style={{ marginTop: 8, padding: "10px 12px", background: "#f0f4fb", border: `1px solid ${T.accent}55`, borderRadius: 4, display: "flex", gap: 10, alignItems: "center" }}>
+                  <img src={selected.images?.[0]} alt="" style={{ width: 56, height: 40, objectFit: "cover", borderRadius: 3, flexShrink: 0 }} />
+                  <div style={{ fontSize: 11.5, lineHeight: 1.5 }}>
+                    <div style={{ fontWeight: 700, color: T.text, textTransform: "uppercase" }}>{selected.brand} {selected.model}</div>
+                    <div style={{ color: T.muted }}>No. Polisi: {selected.noPolisi} · {selected.status} · {fmtShort(selected.price)}</div>
+                  </div>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, carId: "", carPlateSearch: "" }))} style={{ marginLeft: "auto", background: "none", border: "none", color: T.red, fontSize: 16, cursor: "pointer", padding: 4, flexShrink: 0 }}>×</button>
+                </div>
+              );
+            })()}
+            {form.carPlateSearch && !form.carId && (
+              <div style={{ marginTop: 6, fontSize: 11, color: T.red }}>⚠️ Unit dengan No. Polisi ini tidak ditemukan.</div>
+            )}
+          </div>
           <div style={{ marginBottom: 12 }}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Jumlah (Rp)</label>
             <input style={inp} type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="Contoh: 120000000" /></div>
           <div style={{ marginBottom: 16 }}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Keterangan</label>
@@ -932,7 +1078,7 @@ function FinanceView({ transactions, setTransactions, cars }) {
             <div style={{ color: T.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Profit per Unit Terjual</div>
             {soldCars.length === 0 ? <div style={{ color: T.border, fontSize: 12, textAlign: "center", padding: "12px 0" }}>Belum ada unit terjual</div> : soldCars.map(c => (
               <div key={c.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.border}22` }}>
-                <span style={{ color: T.text, fontSize: 12.5 }}>{c.brand} {c.model}</span>
+                <span style={{ color: T.text, fontSize: 12.5 }}>{c.brand} {c.model} {c.noPolisi && <span style={{ color: T.muted, fontSize: 11 }}>({c.noPolisi})</span>}</span>
                 <span style={{ color: T.gold, fontWeight: 700, fontSize: 12.5 }}>+{fmtShort(c.price - c.priceBeli)}</span>
               </div>
             ))}
@@ -940,15 +1086,32 @@ function FinanceView({ transactions, setTransactions, cars }) {
 
           <div style={{ ...card, overflow: "hidden", flex: 1 }}>
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, color: T.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em" }}>Riwayat Transaksi</div>
-            <div style={{ maxHeight: 220, overflow: "auto" }}>
-              {transactions.map(tx => (
-                <div key={tx.id} style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}22`, display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ width: 36, height: 36, background: tx.category === "Pemasukan" ? `${T.green}22` : `${T.red}22`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{tx.category === "Pemasukan" ? "📈" : "📉"}</div>
-                  <div style={{ flex: 1 }}><div style={{ color: T.text, fontSize: 13, fontWeight: 600 }}>{tx.notes}</div><div style={{ color: T.muted, fontSize: 11, marginTop: 2 }}>{tx.type} · {tx.date}</div></div>
-                  <div style={{ color: tx.category === "Pemasukan" ? T.green : T.red, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap" }}>{tx.category === "Pemasukan" ? "+" : "−"}{fmtShort(tx.amount)}</div>
-                  <button onClick={() => deleteDoc(doc(db, "transactions", tx.id)).catch(() => alert("Gagal menghapus."))} style={{ background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 16 }}>×</button>
-                </div>
-              ))}
+            <div style={{ maxHeight: 280, overflow: "auto" }}>
+              {transactions.map(tx => {
+                const relatedCar = tx.carId ? cars.find(c => c.id === tx.carId) : null;
+                return (
+                  <div key={tx.id} style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}22`, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                    <div style={{ width: 36, height: 36, background: tx.category === "Pemasukan" ? `${T.green}22` : `${T.red}22`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{tx.category === "Pemasukan" ? "📈" : "📉"}</div>
+                    <div style={{ flex: 1, minWidth: 120 }}>
+                      <div style={{ color: T.text, fontSize: 13, fontWeight: 600 }}>{tx.notes}</div>
+                      <div style={{ color: T.muted, fontSize: 11, marginTop: 2 }}>{tx.type} · {tx.date} {relatedCar && `· ${relatedCar.noPolisi || relatedCar.model}`}</div>
+                    </div>
+                    <div style={{ color: tx.category === "Pemasukan" ? T.green : T.red, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap" }}>{tx.category === "Pemasukan" ? "+" : "−"}{fmtShort(tx.amount)}</div>
+                    {relatedCar && tx.category === "Pemasukan" && (
+                      <button onClick={async (e) => {
+                        const btn = e.currentTarget;
+                        btn.disabled = true; btn.textContent = "⏳...";
+                        try { await generateKwitansiPDF(tx, relatedCar); }
+                        catch (err) { alert("Gagal membuat kwitansi: " + err.message); }
+                        finally { btn.disabled = false; btn.textContent = "🧾 Cetak"; }
+                      }} style={{ padding: "5px 10px", background: `${T.gold}22`, color: "#8a6d1f", border: `1px solid ${T.gold}66`, borderRadius: 4, fontSize: 11, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+                        🧾 Cetak
+                      </button>
+                    )}
+                    <button onClick={() => deleteDoc(doc(db, "transactions", tx.id)).catch(() => alert("Gagal menghapus."))} style={{ background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 16 }}>×</button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
