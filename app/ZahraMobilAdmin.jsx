@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.1.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
@@ -457,7 +457,7 @@ function InventarisView({ cars, setCars }) {
             </div>
 
             <div className="zm-form-grid3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 18 }}>
-              {[["type", "Tipe", ["SUV", "MPV", "Sedan", "Hatchback", "Pickup"]], ["transmission", "Transmisi", ["Otomatis", "Manual"]], ["fuel", "Bahan Bakar", ["Bensin", "Diesel", "Hybrid", "Listrik"]]].map(([key, label, opts]) => (
+              {[["type", "Tipe", ["Sedan", "Hatchback", "MPV", "Station Wagon", "Coupe", "Convertible", "Sports Car", "Supercar", "Hypercar", "Crossover", "SUV", "Minibus", "Truk", "Pickup", "Double Cabin", "City Car", "Kei Car", "Limousine"]], ["transmission", "Transmisi", ["Otomatis", "Manual"]], ["fuel", "Bahan Bakar", ["Bensin", "Diesel", "Hybrid", "Listrik"]]].map(([key, label, opts]) => (
                 <div key={key}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
                   <select style={inp} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}>{opts.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
               ))}
