@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "2.4.0";
+const APP_VERSION = "2.5.0";
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
@@ -136,7 +136,7 @@ function Sidebar({ active, setActive, onLogout }) {
             cursor: "pointer", marginBottom: 3, background: active === n.key ? "rgba(255,255,255,0.25)" : "transparent",
             color: "#fff", fontWeight: active === n.key ? 700 : 400, fontSize: 12.5, textAlign: "left", fontFamily: xpFont, borderRadius: 3,
           }}>
-            <span style={{ fontSize: 16, flexShrink: 0 }}>{n.icon}</span> <span className="zm-sidebar-label">{n.label}</span>
+            <span style={{ fontSize: 13, flexShrink: 0, width: 22, height: 22, background: "#fff", border: "1px solid rgba(255,255,255,0.6)", borderRadius: 3, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "1px 1px 2px rgba(0,0,0,0.25)" }}>{n.icon}</span> <span className="zm-sidebar-label">{n.label}</span>
           </button>
         ))}
       </nav>
@@ -145,16 +145,16 @@ function Sidebar({ active, setActive, onLogout }) {
           <div style={{ width: 28, height: 28, background: "#fff", border: "1px solid #0A3E9E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>👤</div>
           <div><div style={{ color: "#fff", fontSize: 11.5, fontWeight: 700 }}>Admin</div><div style={{ color: "#cfe0f7", fontSize: 10 }}>Super Admin</div></div>
         </div>
-        <button onClick={onLogout} title="Keluar" style={{ width: "100%", padding: "6px", ...xpBtn(false), fontSize: 11.5, cursor: "pointer" }}>
+        <button onClick={onLogout} title="Keluar" style={{ width: "100%", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "linear-gradient(180deg, #E8625B, #C42B1C)", border: "1px solid #8C1E13", borderRadius: 3, boxShadow: "inset 1px 1px 1px rgba(255,255,255,0.4)", color: "#fff", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, border: "1px solid #fff", borderRadius: 2, fontSize: 10, fontWeight: 900, lineHeight: 1, flexShrink: 0 }}>✕</span>
           <span className="zm-sidebar-label">Keluar</span>
-          <span className="zm-sidebar-icon-only">🚪</span>
         </button>
       </div>
     </aside>
   );
 }
 
-function Header({ title }) {
+function Header({ title, notifCount, onNotifClick }) {
   const now = new Date().toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   return (
     <>
@@ -162,6 +162,14 @@ function Header({ title }) {
         <h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, fontFamily: xpFont, color: "#fff" }}>📁 {title}</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span className="zm-hide-mobile" style={{ fontSize: 11, opacity: 0.9 }}>{now}</span>
+          {typeof notifCount === "number" && (
+            <button onClick={onNotifClick} title={`${notifCount} pesanan baru`} style={{ position: "relative", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 3, width: 26, height: 24, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              🔔
+              {notifCount > 0 && (
+                <span style={{ position: "absolute", top: -6, right: -6, background: "#C42B1C", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 9.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #fff" }}>{notifCount > 9 ? "9+" : notifCount}</span>
+              )}
+            </button>
+          )}
           <div style={{ width: 8, height: 8, background: "#7CFF7C", borderRadius: "50%", boxShadow: "0 0 6px #7CFF7C", border: "1px solid #2a8a2a" }} />
           <span style={{ fontSize: 11, opacity: 0.9 }}>Live</span>
         </div>
@@ -312,13 +320,16 @@ function InspectionForm({ inspection, setInspection }) {
           );
         })}
       </div>
-      <div style={{ background: "#f5f5f0", border: `1px solid ${T.border}`, borderRadius: 0, padding: 16, display: "flex", flexDirection: "column", gap: 6, maxHeight: 280, overflow: "auto" }}>
+      <div style={{ background: "#f5f5f0", border: `1px solid ${T.border}`, borderRadius: 0, padding: 16, display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflow: "auto" }}>
         {inspection[openCat].map((item, idx) => (
-          <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0 }}>
-            <span style={{ color: "#000", fontSize: 12.5, flex: 1 }}>{item.name}</span>
-            <select value={item.status} onChange={e => updateItem(openCat, idx, "status", e.target.value)} style={{ background: `${statusColor[item.status]}22`, color: statusColor[item.status], border: "none", borderRadius: 5, padding: "4px 8px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-              {["OK", "Minor", "Perlu Perhatian"].map(s => <option key={s} value={s} style={{ background: T.card, color: T.text }}>{s}</option>)}
-            </select>
+          <div key={idx} style={{ padding: "8px 10px", background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ color: "#000", fontSize: 12.5, flex: 1 }}>{item.name}</span>
+              <select value={item.status} onChange={e => updateItem(openCat, idx, "status", e.target.value)} style={{ background: `${statusColor[item.status]}22`, color: statusColor[item.status], border: "none", borderRadius: 5, padding: "4px 8px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                {["OK", "Minor", "Perlu Perhatian"].map(s => <option key={s} value={s} style={{ background: T.card, color: T.text }}>{s}</option>)}
+              </select>
+            </div>
+            <input type="text" value={item.note || ""} onChange={e => updateItem(openCat, idx, "note", e.target.value)} placeholder="Catatan tambahan (opsional)..." style={{ width: "100%", marginTop: 6, padding: "5px 8px", fontSize: 11.5, border: `1px solid ${T.border}`, borderRadius: 0, color: T.muted, boxSizing: "border-box", fontFamily: xpFont }} />
           </div>
         ))}
       </div>
@@ -651,9 +662,12 @@ function InventarisView({ cars, setCars }) {
                       {(viewCar.inspection[cat.key] || []).map((item, i) => {
                         const sc = { OK: T.green, Minor: T.amber, "Perlu Perhatian": T.red };
                         return (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0 4px 10px", fontSize: 12 }}>
-                            <span style={{ color: T.muted }}>{item.name}</span>
-                            <span style={{ color: sc[item.status] || T.muted, fontWeight: 700 }}>{item.status}</span>
+                          <div key={i} style={{ padding: "4px 0 4px 10px", fontSize: 12 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                              <span style={{ color: T.muted }}>{item.name}</span>
+                              <span style={{ color: sc[item.status] || T.muted, fontWeight: 700 }}>{item.status}</span>
+                            </div>
+                            {item.note && <div style={{ color: "#8a7f6e", fontSize: 11, fontStyle: "italic", marginTop: 2 }}>📝 {item.note}</div>}
                           </div>
                         );
                       })}
@@ -677,6 +691,7 @@ function InventarisView({ cars, setCars }) {
 function CRMView({ orders, setOrders }) {
   const [dragging, setDragging] = useState(null);
   const [over, setOver] = useState(null);
+  const [activeTab, setActiveTab] = useState(STAGES[0]);
   const stageColor = { "Pesanan Baru": "#a855f7", "Verifikasi Data": T.accent, "Proses Leasing/Pelunasan": T.amber, "Penyiapan Towing": "#06b6d4", "Mobil Terkirim": T.green };
 
   const handleDrop = (stage) => {
@@ -689,12 +704,27 @@ function CRMView({ orders, setOrders }) {
   return (
     <div style={{ padding: 28 }}>
       <div style={{ marginBottom: 20, color: T.muted, fontSize: 13 }}>Drag & drop kartu untuk mengubah tahap pesanan</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, alignItems: "start", overflowX: "auto" }}>
+
+      {/* Tab selector - hanya tampil di mobile */}
+      <div className="zm-crm-tabs" style={{ display: "none", gap: 6, overflowX: "auto", marginBottom: 14, paddingBottom: 4 }}>
+        {STAGES.map(stage => {
+          const count = orders.filter(o => o.stage === stage).length;
+          const color = stageColor[stage];
+          const active = activeTab === stage;
+          return (
+            <button key={stage} onClick={() => setActiveTab(stage)} style={{ flexShrink: 0, padding: "7px 12px", borderRadius: 3, border: `1.5px solid ${active ? color : T.border}`, background: active ? `${color}22` : "#fff", color: active ? color : T.muted, fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+              {stage} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="zm-crm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, alignItems: "start", overflowX: "auto" }}>
         {STAGES.map(stage => {
           const stageOrders = orders.filter(o => o.stage === stage);
           const color = stageColor[stage];
           return (
-            <div key={stage} onDragOver={e => { e.preventDefault(); setOver(stage); }} onDragLeave={() => setOver(null)} onDrop={() => handleDrop(stage)}
+            <div key={stage} className="zm-crm-column" data-stage={stage} onDragOver={e => { e.preventDefault(); setOver(stage); }} onDragLeave={() => setOver(null)} onDrop={() => handleDrop(stage)}
               style={{ background: over === stage ? `${color}11` : T.card, border: `1px solid ${over === stage ? color : T.border}`, borderRadius: 2, minHeight: 200, minWidth: 220 }}>
               <div style={{ padding: "14px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -724,12 +754,25 @@ function CRMView({ orders, setOrders }) {
                     </div>
                   </div>
                 ))}
-                {stageOrders.length === 0 && <div style={{ color: T.border, fontSize: 12, textAlign: "center", padding: "20px 0" }}>Kosong</div>}
+                {stageOrders.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "30px 10px", color: T.border }}>
+                    <div style={{ fontSize: 28, marginBottom: 6 }}>📭</div>
+                    <div style={{ fontSize: 11.5 }}>Belum ada pesanan<br/>di tahap ini</div>
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+      <style>{`
+        @media (max-width: 820px) {
+          .zm-crm-tabs { display: flex !important; }
+          .zm-crm-grid { display: block !important; }
+          .zm-crm-column { display: none !important; min-width: 0 !important; }
+          .zm-crm-column[data-stage="${activeTab}"] { display: block !important; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -932,8 +975,17 @@ export default function ZahraMobilAdmin() {
 
   if (!authChecked) {
     return (
-      <div style={{ background: T.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: T.muted, fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase" }}>Memuat...</div>
+      <div style={{ background: "#000", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: xpFont }}>
+        <img src="/adminzahramobil/logo.png" alt="ZM Showroom" style={{ height: 64, width: "auto", marginBottom: 36 }} />
+        <div style={{ display: "flex", gap: 5, marginBottom: 14 }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ width: 28, height: 9, background: T.gold, borderRadius: 1, animation: `xpBootBlock 1.3s ease-in-out ${i * 0.18}s infinite` }} />
+          ))}
+        </div>
+        <div style={{ color: "#9a9a9a", fontSize: 11.5, letterSpacing: "0.05em" }}>Memulai Zahra Mobil Admin...</div>
+        <style>{`
+          @keyframes xpBootBlock { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+        `}</style>
       </div>
     );
   }
@@ -968,7 +1020,7 @@ export default function ZahraMobilAdmin() {
       `}</style>
       <Sidebar active={page} setActive={setPage} onLogout={() => signOut(auth)} />
       <div className="zm-main-content" style={{ marginLeft: 220, flex: 1, minHeight: "100vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Header title={titles[page]} />
+        <Header title={titles[page]} notifCount={orders.filter(o => o.stage === "Pesanan Baru").length} onNotifClick={() => setPage("crm")} />
         <main style={{ flex: 1, overflow: "auto", background: T.bg }}>
           {page === "dashboard" && <DashboardView cars={cars} orders={orders} transactions={transactions} storageMeta={storageMeta} />}
           {page === "inventaris" && <InventarisView cars={cars} setCars={setCars} />}
