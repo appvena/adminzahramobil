@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.4.0";
+const APP_VERSION = "3.6.0";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
@@ -123,7 +123,7 @@ async function generateKwitansiPDF(tx, car) {
   let qrImg = null;
   if (car) {
     try {
-      const qrUrl = `${GUEST_SITE_URL}/?car=${car.id}`;
+      const qrUrl = `${GUEST_SITE_URL}/?verify=${tx.id}`;
       const qrDataUrl = await window.QRCode.toDataURL(qrUrl, { width: 240, margin: 0 });
       const qrBytes = await fetch(qrDataUrl).then(r => r.arrayBuffer());
       qrImg = await pdfDoc.embedPng(qrBytes);
@@ -134,17 +134,33 @@ async function generateKwitansiPDF(tx, car) {
   const terbilangText = `TERBILANG: ${terbilang(tx.amount || 0).toUpperCase()} RUPIAH`;
 
   // Gambar 1 baris kwitansi lengkap, dimulai dari offsetY (dari atas) dengan tinggi rowH
+  // Background tema lembut (bukan putih polos) - krem sangat tipis untuk seluruh halaman
+  page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: rgb(0.98, 0.97, 0.94) });
+
   const drawRow = (offsetYTop, rowH, label) => {
-    const pad = 16;
+    const pad = 18;
     const top = PAGE_H - offsetYTop; // y absolut bagian atas baris ini
-    let y = top - 14;
+    const bottom = top - rowH;
+    let y = top - 16;
     const xLeft = pad;
     const xRight = PAGE_W - pad;
     const colMid = pad + 280; // kolom tengah (data) mulai di sini
-    const colRight = PAGE_W - pad - 130; // kolom kanan (QR+ttd) mulai di sini
+    const colRight = PAGE_W - pad - 130; // kolom kanan (QR) mulai di sini
 
-    // Label lampiran (pojok kanan atas baris)
-    page.drawText(label, { x: xRight - fontBold.widthOfTextAtSize(label, 8), y: top - 10, size: 8, font: fontBold, color: gold });
+    // Frame kotak mengelilingi kwitansi, dengan jarak dari tepi kertas (bukan menempel)
+    const frameMargin = 10;
+    page.drawRectangle({
+      x: frameMargin, y: bottom + frameMargin,
+      width: PAGE_W - frameMargin * 2, height: rowH - frameMargin * 2,
+      color: rgb(1, 1, 1), borderColor: rgb(0.55, 0.46, 0.22), borderWidth: 1.2,
+    });
+
+    // Watermark: pola teks "ZAHRA MOBIL - ASLI" berulang diagonal, transparan tipis
+    const wmText = "ZAHRA MOBIL  -  ASLI  -  ";
+    const wmFull = wmText.repeat(6);
+    for (let wy = bottom + 20; wy < top - 10; wy += 26) {
+      page.drawText(wmFull, { x: frameMargin + 5, y: wy, size: 7, font: fontBold, color: rgb(0.85, 0.8, 0.6), rotate: window.PDFLib.degrees(18), opacity: 0.35 });
+    }
 
     // Kolom kiri: logo + nama showroom + judul kwitansi
     if (logoImg) {
@@ -185,24 +201,39 @@ async function generateKwitansiPDF(tx, car) {
       yM -= 11;
       rowM("Unit", `${safeText(car.brand)} ${safeText(car.model)}`);
       rowM("No. Polisi", safeText(car.noPolisi));
+      rowM("No. Rangka", safeText(car.noRangka));
+      rowM("No. Mesin", safeText(car.noMesin));
       rowM("Tahun/Warna", `${car.year || "-"} / ${safeText(car.color) || "-"}`);
       rowM("Harga Unit", fmtPdf(car.price || 0), true);
     }
 
-    // Kolom kanan: QR code + tanda tangan
+    // Kolom kanan: QR code saja, bersih tanpa teks tambahan
     if (qrImg) {
-      const qrSize = 58;
+      const qrSize = 62;
       page.drawImage(qrImg, { x: colRight, y: y - qrSize + 6, width: qrSize, height: qrSize });
-      page.drawText("SCAN UNTUK LIHAT UNIT", { x: colRight, y: y - qrSize - 6, size: 5, font: fontRegular, color: muted });
     }
 
-    const sigY = y - 92;
-    const sigW = 120;
-    page.drawText("DIBAYAR OLEH", { x: colRight, y: sigY + 14, size: 5.5, font: fontRegular, color: muted });
-    page.drawLine({ start: { x: colRight, y: sigY }, end: { x: colRight + sigW, y: sigY }, thickness: 0.6, color: dark });
-    page.drawText("(.....................)", { x: colRight, y: sigY - 9, size: 5.5, font: fontRegular, color: dark });
+    // Baris tanda tangan - di BAWAH, terpisah jauh dari QR, full width 2 kolom
+    const sigLineY = bottom + 36;
+    const sigLabelY = bottom + 46;
+    const sigNameY = bottom + 25;
+    const sigColW = (PAGE_W - frameMargin * 2 - pad * 2 - 20) / 2;
+    const sig1X = xLeft;
+    const sig2X = xLeft + sigColW + 20;
 
-    page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA KEPADA ZAHRA MOBIL.", { x: xLeft, y: top - rowH + 12, size: 5.2, font: fontRegular, color: muted });
+    page.drawLine({ start: { x: xLeft, y: bottom + 58 }, end: { x: xRight, y: bottom + 58 }, thickness: 0.4, color: lineGray });
+
+    page.drawText("DIBAYAR OLEH (KONSUMEN)", { x: sig1X, y: sigLabelY, size: 5.8, font: fontRegular, color: muted });
+    page.drawLine({ start: { x: sig1X, y: sigLineY }, end: { x: sig1X + sigColW, y: sigLineY }, thickness: 0.6, color: dark });
+    page.drawText(`( ${safeText(tx.namaPenyetor).toUpperCase() || "....................."} )`, { x: sig1X, y: sigNameY, size: 5.8, font: fontRegular, color: dark });
+
+    page.drawText("DITERIMA OLEH - ZAHRA MOBIL (TTD & STEMPEL)", { x: sig2X, y: sigLabelY, size: 5.8, font: fontRegular, color: muted });
+    page.drawLine({ start: { x: sig2X, y: sigLineY }, end: { x: sig2X + sigColW, y: sigLineY }, thickness: 0.6, color: dark });
+    page.drawText("(.....................)", { x: sig2X, y: sigNameY, size: 5.8, font: fontRegular, color: dark });
+
+    // Footer: ucapan terima kasih (kiri) + label lampiran (kanan, jauh dari QR)
+    page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA KEPADA ZAHRA MOBIL.", { x: xLeft, y: bottom + 14, size: 5, font: fontRegular, color: muted });
+    page.drawText(label, { x: xRight - fontBold.widthOfTextAtSize(label, 6.5), y: bottom + 14, size: 6.5, font: fontBold, color: gold });
   };
 
   const rowH = PAGE_H / 3;
@@ -1064,7 +1095,7 @@ function CRMView({ orders, setOrders }) {
 
 // ─── FINANCE ─────────────────────────────────────────────────────────────────
 function FinanceView({ transactions, setTransactions, cars }) {
-  const [form, setForm] = useState({ type: "DP", amount: "", date: new Date().toISOString().split("T")[0], notes: "", category: "Pemasukan", carId: "", carPlateSearch: "" });
+  const [form, setForm] = useState({ type: "DP", amount: "", date: new Date().toISOString().split("T")[0], notes: "", category: "Pemasukan", carId: "", carPlateSearch: "", namaPenyetor: "" });
 
   const pemasukan = transactions.filter(t => t.category === "Pemasukan").reduce((s, t) => s + t.amount, 0);
   const pengeluaran = transactions.filter(t => t.category === "Pengeluaran").reduce((s, t) => s + t.amount, 0);
@@ -1077,7 +1108,7 @@ function FinanceView({ transactions, setTransactions, cars }) {
     try {
       const { carPlateSearch, ...payload } = form;
       await addDoc(collection(db, "transactions"), { ...payload, amount: Number(form.amount) });
-      setForm(f => ({ ...f, amount: "", notes: "", carId: "", carPlateSearch: "" }));
+      setForm(f => ({ ...f, amount: "", notes: "", carId: "", carPlateSearch: "", namaPenyetor: "" }));
     } catch (e) {
       alert("Gagal menyimpan transaksi.");
     }
@@ -1140,6 +1171,8 @@ function FinanceView({ transactions, setTransactions, cars }) {
               <div style={{ marginTop: 6, fontSize: 11, color: T.red }}>⚠️ Unit dengan No. Polisi ini tidak ditemukan.</div>
             )}
           </div>
+          <div style={{ marginBottom: 12 }}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Nama Penyetor (opsional, untuk pemasukan)</label>
+            <input style={inp} value={form.namaPenyetor || ""} onChange={e => setForm(f => ({ ...f, namaPenyetor: e.target.value }))} placeholder="Contoh: Budi Santoso" /></div>
           <div style={{ marginBottom: 12 }}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Jumlah (Rp)</label>
             <input style={inp} type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="Contoh: 120000000" /></div>
           <div style={{ marginBottom: 16 }}><label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Keterangan</label>
