@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.6.0";
+const APP_VERSION = "3.6.1";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
@@ -155,11 +155,11 @@ async function generateKwitansiPDF(tx, car) {
       color: rgb(1, 1, 1), borderColor: rgb(0.55, 0.46, 0.22), borderWidth: 1.2,
     });
 
-    // Watermark: pola teks "ZAHRA MOBIL - ASLI" berulang diagonal, transparan tipis
-    const wmText = "ZAHRA MOBIL  -  ASLI  -  ";
-    const wmFull = wmText.repeat(6);
-    for (let wy = bottom + 20; wy < top - 10; wy += 26) {
-      page.drawText(wmFull, { x: frameMargin + 5, y: wy, size: 7, font: fontBold, color: rgb(0.85, 0.8, 0.6), rotate: window.PDFLib.degrees(18), opacity: 0.35 });
+    // Watermark: pola teks "ZAHRA MOBIL ASLI" berulang diagonal, kecil dan rapat menutupi seluruh kwitansi
+    const wmText = "ZAHRA MOBIL ASLI ";
+    const wmFull = wmText.repeat(20);
+    for (let wy = bottom - 30; wy < top + 30; wy += 11) {
+      page.drawText(wmFull, { x: frameMargin - 60, y: wy, size: 5.5, font: fontBold, color: rgb(0.82, 0.76, 0.55), rotate: window.PDFLib.degrees(18), opacity: 0.4 });
     }
 
     // Kolom kiri: logo + nama showroom + judul kwitansi
