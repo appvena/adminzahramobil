@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.3.0";
+const APP_VERSION = "3.4.0";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
@@ -100,8 +100,8 @@ async function generateKwitansiPDF(tx, car) {
 
   const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
   const pdfDoc = await PDFDocument.create();
-  // Halaman landscape lebar pendek (mirip rasio kwitansi/struk asli), dibagi jadi 3 kolom slip
-  const PAGE_W = 900, PAGE_H = 330;
+  // Halaman landscape A4 penuh, dibagi jadi 3 BARIS horizontal (bukan kolom) - tiap baris 1 lampiran
+  const PAGE_W = 842, PAGE_H = 595;
   const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -112,7 +112,7 @@ async function generateKwitansiPDF(tx, car) {
   const muted = rgb(0.45, 0.45, 0.45);
   const lineGray = rgb(0.85, 0.85, 0.85);
 
-  // Siapkan logo & QR sekali saja, dipakai ulang di tiap slip
+  // Siapkan logo & QR sekali saja, dipakai ulang di tiap baris
   let logoImg = null;
   try {
     const logoRes = await fetch("/adminzahramobil/logo.png");
@@ -133,104 +133,95 @@ async function generateKwitansiPDF(tx, car) {
   const txDate = tx.date ? new Date(tx.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-";
   const terbilangText = `TERBILANG: ${terbilang(tx.amount || 0).toUpperCase()} RUPIAH`;
 
-  // Gambar 1 slip kwitansi lengkap, dimulai dari offsetX dengan lebar slipW
-  const drawSlip = (offsetX, slipW, label) => {
-    const pad = 14;
-    let y = PAGE_H - 18;
-    const x0 = offsetX + pad;
-    const xMax = offsetX + slipW - pad;
+  // Gambar 1 baris kwitansi lengkap, dimulai dari offsetY (dari atas) dengan tinggi rowH
+  const drawRow = (offsetYTop, rowH, label) => {
+    const pad = 16;
+    const top = PAGE_H - offsetYTop; // y absolut bagian atas baris ini
+    let y = top - 14;
+    const xLeft = pad;
+    const xRight = PAGE_W - pad;
+    const colMid = pad + 280; // kolom tengah (data) mulai di sini
+    const colRight = PAGE_W - pad - 130; // kolom kanan (QR+ttd) mulai di sini
 
-    // Label lampiran (pojok kanan atas slip)
-    page.drawText(label, { x: xMax - fontBold.widthOfTextAtSize(label, 6.5), y: PAGE_H - 12, size: 6.5, font: fontBold, color: gold });
+    // Label lampiran (pojok kanan atas baris)
+    page.drawText(label, { x: xRight - fontBold.widthOfTextAtSize(label, 8), y: top - 10, size: 8, font: fontBold, color: gold });
 
-    // Header logo + nama
+    // Kolom kiri: logo + nama showroom + judul kwitansi
     if (logoImg) {
-      const logoDims = logoImg.scale(22 / logoImg.height);
-      page.drawImage(logoImg, { x: x0, y: y - 18, width: logoDims.width, height: 22 });
+      const logoDims = logoImg.scale(30 / logoImg.height);
+      page.drawImage(logoImg, { x: xLeft, y: y - 24, width: logoDims.width, height: 30 });
     }
-    page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: x0 + 30, y: y - 3, size: 9.5, font: fontBold, color: dark });
-    page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: x0 + 30, y: y - 12, size: 4.6, font: fontRegular, color: muted, maxWidth: slipW - 30 - pad });
-    page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: x0 + 30, y: y - 19, size: 4.6, font: fontRegular, color: muted });
+    page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: xLeft + 40, y: y - 4, size: 11, font: fontBold, color: dark });
+    page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: xLeft + 40, y: y - 15, size: 5.5, font: fontRegular, color: muted, maxWidth: 230 });
+    page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: xLeft + 40, y: y - 24, size: 5.5, font: fontRegular, color: muted });
 
-    y -= 30;
-    page.drawLine({ start: { x: x0, y }, end: { x: xMax, y }, thickness: 1, color: gold });
-    y -= 13;
+    let yL = y - 46;
+    page.drawText("KWITANSI PEMBAYARAN", { x: xLeft, y: yL, size: 10, font: fontBold, color: dark });
+    yL -= 11;
+    page.drawText(`NO: ${tx.id?.slice(0, 8).toUpperCase() || "-"}`, { x: xLeft, y: yL, size: 6, font: fontRegular, color: muted });
+    yL -= 9;
+    page.drawText(txDate.toUpperCase(), { x: xLeft, y: yL, size: 6, font: fontRegular, color: muted });
+    yL -= 14;
+    page.drawText("JUMLAH DIBAYAR", { x: xLeft, y: yL, size: 7, font: fontBold, color: dark });
+    yL -= 13;
+    page.drawText(fmtPdf(tx.amount || 0), { x: xLeft, y: yL, size: 14, font: fontBold, color: gold });
+    yL -= 14;
+    page.drawText(terbilangText, { x: xLeft, y: yL, size: 5.6, font: fontItalic, color: dark, maxWidth: 250, lineHeight: 7 });
 
-    page.drawText("KWITANSI PEMBAYARAN", { x: x0, y, size: 8.5, font: fontBold, color: dark });
-    y -= 10;
-    page.drawText(`NO: ${tx.id?.slice(0, 8).toUpperCase() || "-"}  |  ${txDate.toUpperCase()}`, { x: x0, y, size: 5.2, font: fontRegular, color: muted });
-    y -= 14;
-
-    const row = (lbl, value, bold = false) => {
-      page.drawText(lbl.toUpperCase(), { x: x0, y, size: 5.6, font: fontRegular, color: muted });
-      page.drawText(String(value || "-").toUpperCase(), { x: x0 + 66, y, size: 5.6, font: bold ? fontBold : fontRegular, color: dark, maxWidth: slipW - 66 - pad * 2 });
-      y -= 9;
+    // Kolom tengah: detail transaksi + data kendaraan
+    let yM = y;
+    const rowM = (lbl, value, bold = false) => {
+      page.drawText(lbl.toUpperCase(), { x: colMid, y: yM, size: 6, font: fontRegular, color: muted });
+      page.drawText(String(value || "-").toUpperCase(), { x: colMid + 70, y: yM, size: 6, font: bold ? fontBold : fontRegular, color: dark, maxWidth: colRight - colMid - 70 - 10 });
+      yM -= 11;
     };
-
-    row("Jenis", `${safeText(tx.category)} - ${safeText(tx.type)}`);
-    row("Keterangan", safeText(tx.notes));
-    y -= 3;
-
+    rowM("Jenis", `${safeText(tx.category)} - ${safeText(tx.type)}`);
+    rowM("Keterangan", safeText(tx.notes));
+    yM -= 4;
     if (car) {
-      page.drawLine({ start: { x: x0, y }, end: { x: xMax, y }, thickness: 0.4, color: lineGray });
-      y -= 9;
-      page.drawText("DATA KENDARAAN", { x: x0, y, size: 5.6, font: fontBold, color: gold });
-      y -= 9;
-      row("Unit", `${safeText(car.brand)} ${safeText(car.model)}`);
-      row("No. Polisi", safeText(car.noPolisi));
-      row("Tahun/Warna", `${car.year || "-"} / ${safeText(car.color) || "-"}`);
-      row("Harga Unit", fmtPdf(car.price || 0), true);
+      page.drawLine({ start: { x: colMid, y: yM }, end: { x: colRight - 10, y: yM }, thickness: 0.4, color: lineGray });
+      yM -= 11;
+      page.drawText("DATA KENDARAAN", { x: colMid, y: yM, size: 6.2, font: fontBold, color: gold });
+      yM -= 11;
+      rowM("Unit", `${safeText(car.brand)} ${safeText(car.model)}`);
+      rowM("No. Polisi", safeText(car.noPolisi));
+      rowM("Tahun/Warna", `${car.year || "-"} / ${safeText(car.color) || "-"}`);
+      rowM("Harga Unit", fmtPdf(car.price || 0), true);
     }
 
-    y -= 4;
-    page.drawLine({ start: { x: x0, y }, end: { x: xMax, y }, thickness: 1, color: gold });
-    y -= 12;
-
-    page.drawText("JUMLAH DIBAYAR", { x: x0, y, size: 6, font: fontBold, color: dark });
-    y -= 11;
-    page.drawText(fmtPdf(tx.amount || 0), { x: x0, y, size: 11, font: fontBold, color: gold });
-    y -= 12;
-
-    page.drawText(terbilangText, { x: x0, y, size: 4.8, font: fontItalic, color: dark, maxWidth: slipW - pad * 2, lineHeight: 6 });
-    y -= 18;
-
-    // QR di kanan slip
+    // Kolom kanan: QR code + tanda tangan
     if (qrImg) {
-      const qrSize = 38;
-      page.drawImage(qrImg, { x: xMax - qrSize, y: y - qrSize + 12, width: qrSize, height: qrSize });
-      page.drawText("SCAN UNIT", { x: xMax - qrSize, y: y - qrSize + 1, size: 4.2, font: fontRegular, color: muted });
+      const qrSize = 58;
+      page.drawImage(qrImg, { x: colRight, y: y - qrSize + 6, width: qrSize, height: qrSize });
+      page.drawText("SCAN UNTUK LIHAT UNIT", { x: colRight, y: y - qrSize - 6, size: 5, font: fontRegular, color: muted });
     }
 
-    // Tanda tangan
-    const sigW = (slipW - pad * 2 - 10) / 2;
-    page.drawText("DIBAYAR OLEH", { x: x0, y: y - 3, size: 4.8, font: fontRegular, color: muted });
-    page.drawLine({ start: { x: x0, y: y - 22 }, end: { x: x0 + sigW, y: y - 22 }, thickness: 0.5, color: dark });
-    page.drawText("(.....................)", { x: x0, y: y - 30, size: 4.8, font: fontRegular, color: dark });
+    const sigY = y - 92;
+    const sigW = 120;
+    page.drawText("DIBAYAR OLEH", { x: colRight, y: sigY + 14, size: 5.5, font: fontRegular, color: muted });
+    page.drawLine({ start: { x: colRight, y: sigY }, end: { x: colRight + sigW, y: sigY }, thickness: 0.6, color: dark });
+    page.drawText("(.....................)", { x: colRight, y: sigY - 9, size: 5.5, font: fontRegular, color: dark });
 
-    page.drawText("DITERIMA OLEH", { x: x0 + sigW + 10, y: y - 3, size: 4.8, font: fontRegular, color: muted });
-    page.drawLine({ start: { x: x0 + sigW + 10, y: y - 22 }, end: { x: xMax, y: y - 22 }, thickness: 0.5, color: dark });
-    page.drawText("(ADMIN/SALES)", { x: x0 + sigW + 10, y: y - 30, size: 4.8, font: fontRegular, color: dark });
-
-    page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA.", { x: x0, y: 9, size: 4.4, font: fontRegular, color: muted });
+    page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA KEPADA ZAHRA MOBIL.", { x: xLeft, y: top - rowH + 12, size: 5.2, font: fontRegular, color: muted });
   };
 
-  const slipW = PAGE_W / 3;
-  drawSlip(0, slipW, "LAMPIRAN 1 - KONSUMEN");
-  drawSlip(slipW, slipW, "LAMPIRAN 2 - SHOWROOM");
-  drawSlip(slipW * 2, slipW, "LAMPIRAN 3 - CADANGAN");
+  const rowH = PAGE_H / 3;
+  drawRow(0, rowH, "LAMPIRAN 1 - KONSUMEN");
+  drawRow(rowH, rowH, "LAMPIRAN 2 - SHOWROOM");
+  drawRow(rowH * 2, rowH, "LAMPIRAN 3 - CADANGAN");
 
-  // Garis putus-putus pemisah antar slip + tulisan gunting
-  const drawCutLine = (x) => {
+  // Garis putus-putus pemisah HORIZONTAL antar baris + tulisan gunting
+  const drawCutLine = (yPos) => {
     const dashLen = 4, gapLen = 3;
-    let yy = PAGE_H - 8;
-    while (yy > 8) {
-      page.drawLine({ start: { x, y: yy }, end: { x, y: Math.max(yy - dashLen, 8) }, thickness: 0.8, color: rgb(0.6, 0.6, 0.6) });
-      yy -= dashLen + gapLen;
+    let xx = 8;
+    while (xx < PAGE_W - 8) {
+      page.drawLine({ start: { x: xx, y: yPos }, end: { x: Math.min(xx + dashLen, PAGE_W - 8), y: yPos }, thickness: 0.8, color: rgb(0.6, 0.6, 0.6) });
+      xx += dashLen + gapLen;
     }
-    page.drawText("- - GUNTING DI SINI - -", { x: x - 42, y: PAGE_H / 2, size: 5.5, font: fontItalic, color: rgb(0.55, 0.55, 0.55), rotate: window.PDFLib.degrees(90) });
+    page.drawText("- - GUNTING DI SINI - -", { x: PAGE_W / 2 - 50, y: yPos - 8, size: 6, font: fontItalic, color: rgb(0.55, 0.55, 0.55) });
   };
-  drawCutLine(slipW);
-  drawCutLine(slipW * 2);
+  drawCutLine(PAGE_H - rowH);
+  drawCutLine(PAGE_H - rowH * 2);
 
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([pdfBytes], { type: "application/pdf" });
