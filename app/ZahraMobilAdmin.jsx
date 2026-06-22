@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.0.0";
+const APP_VERSION = "3.0.1";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
@@ -31,25 +31,39 @@ const SHOWROOM_INFO = {
   telepon: "0811-6707-099",
 };
 
-// Loader script CDN dinamis - dipanggil sekali, di-cache supaya tidak load ulang
+// Loader script CDN dinamis dengan fallback multi-sumber - dipanggil sekali, di-cache supaya tidak load ulang
 const scriptCache = {};
-function loadScript(src, globalCheck) {
+function loadScript(urls, globalCheck) {
   if (typeof window !== "undefined" && window[globalCheck]) return Promise.resolve();
-  if (scriptCache[src]) return scriptCache[src];
-  scriptCache[src] = new Promise((resolve, reject) => {
+  const cacheKey = globalCheck;
+  if (scriptCache[cacheKey]) return scriptCache[cacheKey];
+
+  const tryLoad = (urlList, idx) => new Promise((resolve, reject) => {
+    if (idx >= urlList.length) return reject(new Error(`Gagal memuat library "${globalCheck}" dari semua sumber CDN. Cek koneksi internet Anda.`));
     const s = document.createElement("script");
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = () => reject(new Error(`Gagal memuat library dari ${src}`));
+    s.src = urlList[idx];
+    s.onload = () => resolve();
+    s.onerror = () => {
+      s.remove();
+      tryLoad(urlList, idx + 1).then(resolve).catch(reject);
+    };
     document.head.appendChild(s);
   });
-  return scriptCache[src];
+
+  scriptCache[cacheKey] = tryLoad(urls, 0);
+  return scriptCache[cacheKey];
 }
 
 // Generate kwitansi PDF dengan logo showroom + QR code menuju halaman detail mobil
 async function generateKwitansiPDF(tx, car) {
-  await loadScript("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js", "PDFLib");
-  await loadScript("https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js", "QRCode");
+  await loadScript([
+    "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js",
+    "https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js",
+  ], "PDFLib");
+  await loadScript([
+    "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js",
+    "https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js",
+  ], "QRCode");
 
   const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
   const pdfDoc = await PDFDocument.create();
