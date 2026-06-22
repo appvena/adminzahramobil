@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.2.0";
+const APP_VERSION = "3.2.1";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
@@ -75,6 +75,17 @@ function loadScript(urls, globalCheck) {
 }
 
 // Generate kwitansi PDF dengan logo showroom + QR code menuju halaman detail mobil
+// Bersihkan teks dari karakter di luar WinAnsi (emoji, simbol unicode) sebelum dipakai di PDF,
+// supaya tidak error "cannot encode" kalau data dari Admin/Firestore mengandung emoji.
+function safeText(str) {
+  if (str === null || str === undefined) return "";
+  return String(str).replace(/[^\x00-\xFF]/g, "").trim();
+}
+// Format Rupiah khusus untuk PDF - normalisasi non-breaking space jadi spasi biasa
+function fmtPdf(n) {
+  return fmt(n).replace(/\u00A0/g, " ");
+}
+
 async function generateKwitansiPDF(tx, car) {
   await loadScript([
     "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js",
@@ -147,17 +158,17 @@ async function generateKwitansiPDF(tx, car) {
 
     page.drawText("KWITANSI PEMBAYARAN", { x: x0, y, size: 10, font: fontBold, color: dark });
     y -= 12;
-    page.drawText(`NO: ${tx.id?.slice(0, 8).toUpperCase() || "—"}  |  ${txDate.toUpperCase()}`, { x: x0, y, size: 6, font: fontRegular, color: muted });
+    page.drawText(`NO: ${tx.id?.slice(0, 8).toUpperCase() || "-"}  |  ${txDate.toUpperCase()}`, { x: x0, y, size: 6, font: fontRegular, color: muted });
     y -= 18;
 
     const row = (lbl, value, bold = false) => {
       page.drawText(lbl.toUpperCase(), { x: x0, y, size: 6.5, font: fontRegular, color: muted });
-      page.drawText(String(value || "—").toUpperCase(), { x: x0 + 78, y, size: 6.5, font: bold ? fontBold : fontRegular, color: dark, maxWidth: slipW - 78 - pad * 2 });
+      page.drawText(String(value || "-").toUpperCase(), { x: x0 + 78, y, size: 6.5, font: bold ? fontBold : fontRegular, color: dark, maxWidth: slipW - 78 - pad * 2 });
       y -= 11;
     };
 
-    row("Jenis", `${tx.category} — ${tx.type}`);
-    row("Keterangan", tx.notes);
+    row("Jenis", `${safeText(tx.category)} - ${safeText(tx.type)}`);
+    row("Keterangan", safeText(tx.notes));
     y -= 4;
 
     if (car) {
@@ -165,10 +176,10 @@ async function generateKwitansiPDF(tx, car) {
       y -= 11;
       page.drawText("DATA KENDARAAN", { x: x0, y, size: 6.5, font: fontBold, color: gold });
       y -= 11;
-      row("Unit", `${car.brand || ""} ${car.model || ""}`);
-      row("No. Polisi", car.noPolisi);
-      row("Tahun/Warna", `${car.year || "—"} / ${car.color || "—"}`);
-      row("Harga Unit", fmt(car.price || 0), true);
+      row("Unit", `${safeText(car.brand)} ${safeText(car.model)}`);
+      row("No. Polisi", safeText(car.noPolisi));
+      row("Tahun/Warna", `${car.year || "-"} / ${safeText(car.color) || "-"}`);
+      row("Harga Unit", fmtPdf(car.price || 0), true);
     }
 
     y -= 6;
@@ -177,7 +188,7 @@ async function generateKwitansiPDF(tx, car) {
 
     page.drawText("JUMLAH DIBAYAR", { x: x0, y, size: 7, font: fontBold, color: dark });
     y -= 14;
-    page.drawText(fmt(tx.amount || 0), { x: x0, y, size: 13, font: fontBold, color: gold });
+    page.drawText(fmtPdf(tx.amount || 0), { x: x0, y, size: 13, font: fontBold, color: gold });
     y -= 16;
 
     page.drawText(terbilangText, { x: x0, y, size: 5.5, font: fontItalic, color: dark, maxWidth: slipW - pad * 2, lineHeight: 7 });
@@ -204,9 +215,9 @@ async function generateKwitansiPDF(tx, car) {
   };
 
   const slipW = PAGE_W / 3;
-  drawSlip(0, slipW, "LAMPIRAN 1 — KONSUMEN");
-  drawSlip(slipW, slipW, "LAMPIRAN 2 — SHOWROOM");
-  drawSlip(slipW * 2, slipW, "LAMPIRAN 3 — CADANGAN");
+  drawSlip(0, slipW, "LAMPIRAN 1 - KONSUMEN");
+  drawSlip(slipW, slipW, "LAMPIRAN 2 - SHOWROOM");
+  drawSlip(slipW * 2, slipW, "LAMPIRAN 3 - CADANGAN");
 
   // Garis putus-putus pemisah antar slip + tulisan gunting
   const drawCutLine = (x) => {
@@ -216,7 +227,7 @@ async function generateKwitansiPDF(tx, car) {
       page.drawLine({ start: { x, y: yy }, end: { x, y: Math.max(yy - dashLen, 8) }, thickness: 0.8, color: rgb(0.6, 0.6, 0.6) });
       yy -= dashLen + gapLen;
     }
-    page.drawText("✂ GUNTING DI SINI", { x: x - 38, y: PAGE_H / 2, size: 6.5, font: fontItalic, color: rgb(0.55, 0.55, 0.55), rotate: window.PDFLib.degrees(90) });
+    page.drawText("- - - - GUNTING DI SINI - - - -", { x: x - 55, y: PAGE_H / 2, size: 6.5, font: fontItalic, color: rgb(0.55, 0.55, 0.55), rotate: window.PDFLib.degrees(90) });
   };
   drawCutLine(slipW);
   drawCutLine(slipW * 2);
