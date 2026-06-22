@@ -2,7 +2,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { db, auth } from "./firebase";
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, increment } from "firebase/firestore";
-import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
+import { signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 
 // ─── MOCK DATA ───────────────────────────────────────────────────────────────
 const INSPECTION_CATEGORIES = [
@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.6.1";
+const APP_VERSION = "3.7.0";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
@@ -148,18 +148,18 @@ async function generateKwitansiPDF(tx, car) {
     const colRight = PAGE_W - pad - 130; // kolom kanan (QR) mulai di sini
 
     // Frame kotak mengelilingi kwitansi, dengan jarak dari tepi kertas (bukan menempel)
-    const frameMargin = 10;
+    const frameMargin = 18;
     page.drawRectangle({
       x: frameMargin, y: bottom + frameMargin,
       width: PAGE_W - frameMargin * 2, height: rowH - frameMargin * 2,
       color: rgb(1, 1, 1), borderColor: rgb(0.55, 0.46, 0.22), borderWidth: 1.2,
     });
 
-    // Watermark: pola teks "ZAHRA MOBIL ASLI" berulang diagonal, kecil dan rapat menutupi seluruh kwitansi
+    // Watermark: pola teks "ZAHRA MOBIL ASLI" berulang diagonal, pudar dan menutupi PENUH area frame
     const wmText = "ZAHRA MOBIL ASLI ";
-    const wmFull = wmText.repeat(20);
-    for (let wy = bottom - 30; wy < top + 30; wy += 11) {
-      page.drawText(wmFull, { x: frameMargin - 60, y: wy, size: 5.5, font: fontBold, color: rgb(0.82, 0.76, 0.55), rotate: window.PDFLib.degrees(18), opacity: 0.4 });
+    const wmFull = wmText.repeat(24);
+    for (let wy = bottom - 40; wy < top + 40; wy += 11) {
+      page.drawText(wmFull, { x: frameMargin - 80, y: wy, size: 5.5, font: fontBold, color: rgb(0.85, 0.8, 0.62), rotate: window.PDFLib.degrees(18), opacity: 0.22 });
     }
 
     // Kolom kiri: logo + nama showroom + judul kwitansi
@@ -481,6 +481,70 @@ function Header({ title, notifCount, onNotifClick }) {
   );
 }
 
+// ─── MODAL KONFIRMASI HAPUS DENGAN PASSWORD ──────────────────────────────────
+// Dipakai di seluruh aplikasi sebelum aksi hapus apa pun (transaksi, mobil, pesanan).
+// Memverifikasi ulang password Admin yang sedang login via Firebase reauthenticate,
+// supaya tidak ada penghapusan tidak sengaja meski sesi sedang aktif.
+function ConfirmDeleteModal({ itemLabel, onConfirm, onCancel }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  const handleConfirm = async () => {
+    if (!password) { setError("Password wajib diisi."); return; }
+    setVerifying(true);
+    setError("");
+    try {
+      const user = auth.currentUser;
+      if (!user || !user.email) throw new Error("Sesi tidak ditemukan, silakan login ulang.");
+      const credential = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(user, credential);
+      onConfirm();
+    } catch (e) {
+      setError("Password salah. Penghapusan dibatalkan.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={e => e.target === e.currentTarget && onCancel()}>
+      <div style={{ background: "#ECE9D8", border: "2px solid #0A3E9E", borderRadius: 6, width: "100%", maxWidth: 360, boxShadow: "3px 3px 14px rgba(0,0,0,0.5)", overflow: "hidden", fontFamily: xpFont }}>
+        <div style={{ ...xpTitlebar, borderRadius: 0, padding: "6px 8px", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 12 }}>Konfirmasi Hapus</span>
+          <button onClick={onCancel} style={{ background: "linear-gradient(180deg, #E8625B, #C42B1C)", border: "1px solid #8C1E13", color: "#fff", width: 20, height: 18, borderRadius: 2, cursor: "pointer", fontSize: 11, lineHeight: 1, fontWeight: 700 }}>✕</button>
+        </div>
+        <div style={{ padding: "20px 20px 8px" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 16 }}>
+            <div style={{ fontSize: 28, flexShrink: 0 }}>⚠️</div>
+            <div style={{ fontSize: 12.5, color: "#000", lineHeight: 1.5 }}>
+              Anda akan menghapus <b>{itemLabel}</b>. Tindakan ini tidak bisa dibatalkan. Masukkan password Admin untuk konfirmasi.
+            </div>
+          </div>
+          <input
+            type="password"
+            value={password}
+            onChange={e => { setPassword(e.target.value); setError(""); }}
+            onKeyDown={e => e.key === "Enter" && handleConfirm()}
+            placeholder="Password Admin"
+            autoFocus
+            style={{ width: "100%", padding: "8px 10px", border: `1px solid ${error ? "#C42B1C" : "#7F9DB9"}`, borderRadius: 3, fontSize: 13, marginBottom: 6, boxSizing: "border-box", fontFamily: xpFont }}
+          />
+          {error && <div style={{ color: "#C42B1C", fontSize: 11, marginBottom: 8 }}>{error}</div>}
+        </div>
+        <div style={{ padding: "8px 20px 20px", display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button onClick={handleConfirm} disabled={verifying} style={{ padding: "7px 18px", background: "linear-gradient(180deg, #E8625B, #C42B1C)", border: "1px solid #8C1E13", borderRadius: 3, color: "#fff", fontWeight: 700, fontSize: 12, cursor: verifying ? "default" : "pointer", opacity: verifying ? 0.6 : 1 }}>
+            {verifying ? "Memeriksa..." : "Ya, Hapus"}
+          </button>
+          <button onClick={onCancel} style={{ padding: "7px 18px", ...xpBtn(false), fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+            Batal
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatCard({ icon, label, value, sub, color }) {
   return (
     <div style={{ ...card, padding: "12px 14px", fontFamily: xpFont }}>
@@ -737,12 +801,16 @@ function InventarisView({ cars, setCars }) {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Hapus unit ini?")) return;
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, label } atau null
+
+  const handleDelete = (car) => setDeleteTarget({ id: car.id, label: `unit ${car.brand} ${car.model}` });
+  const confirmDeleteCar = async () => {
     try {
-      await deleteDoc(doc(db, "cars", id));
+      await deleteDoc(doc(db, "cars", deleteTarget.id));
     } catch (e) {
       alert("Gagal menghapus data. Silakan coba lagi.");
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -903,7 +971,7 @@ function InventarisView({ cars, setCars }) {
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => { setViewCar(car); setViewActiveImg(0); }} style={{ padding: "6px 12px", background: `${T.green}22`, color: T.green, border: "none", borderRadius: 5, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Lihat</button>
                     <button onClick={() => handleEdit(car)} style={{ padding: "6px 12px", background: `${T.accent}22`, color: T.accent, border: "none", borderRadius: 5, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Edit</button>
-                    <button onClick={() => handleDelete(car.id)} style={{ padding: "6px 12px", background: `${T.red}22`, color: T.red, border: "none", borderRadius: 5, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Hapus</button>
+                    <button onClick={() => handleDelete(car)} style={{ padding: "6px 12px", background: `${T.red}22`, color: T.red, border: "none", borderRadius: 5, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>Hapus</button>
                   </div>
                 </td>
               </tr>
@@ -994,6 +1062,10 @@ function InventarisView({ cars, setCars }) {
           </div>
         </div>
       )}
+
+      {deleteTarget && (
+        <ConfirmDeleteModal itemLabel={deleteTarget.label} onConfirm={confirmDeleteCar} onCancel={() => setDeleteTarget(null)} />
+      )}
     </div>
   );
 }
@@ -1003,7 +1075,18 @@ function CRMView({ orders, setOrders }) {
   const [dragging, setDragging] = useState(null);
   const [over, setOver] = useState(null);
   const [activeTab, setActiveTab] = useState(STAGES[0]);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const stageColor = { "Pesanan Baru": "#a855f7", "Verifikasi Data": T.accent, "Proses Leasing/Pelunasan": T.amber, "Penyiapan Towing": "#06b6d4", "Mobil Terkirim": T.green };
+
+  const confirmDeleteOrder = async () => {
+    try {
+      await deleteDoc(doc(db, "orders", deleteTarget.id));
+    } catch (e) {
+      alert("Gagal menghapus.");
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
 
   const handleDrop = (stage) => {
     if (dragging) {
@@ -1066,7 +1149,7 @@ function CRMView({ orders, setOrders }) {
                     </select>
                     <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
                       <a href={`https://wa.me/${toWaNumber(o.hp)}`} target="_blank" rel="noreferrer" style={{ flex: 1, padding: "5px", background: "#25D36622", color: "#25D366", border: "none", borderRadius: 5, fontSize: 11, fontWeight: 600, textAlign: "center", textDecoration: "none" }}>💬 WA</a>
-                      <button onClick={() => { if (window.confirm("Hapus pesanan ini?")) deleteDoc(doc(db, "orders", o.id)).catch(() => alert("Gagal menghapus.")); }} style={{ padding: "5px 8px", background: `${T.red}22`, color: T.red, border: "none", borderRadius: 5, fontSize: 11, cursor: "pointer" }}>✕</button>
+                      <button onClick={() => setDeleteTarget({ id: o.id, label: `pesanan dari ${o.nama || "konsumen"}` })} style={{ padding: "5px 8px", background: `${T.red}22`, color: T.red, border: "none", borderRadius: 5, fontSize: 11, cursor: "pointer" }}>✕</button>
                     </div>
                   </div>
                 ))}
@@ -1089,6 +1172,10 @@ function CRMView({ orders, setOrders }) {
           .zm-crm-column[data-stage="${activeTab}"] { display: block !important; }
         }
       `}</style>
+
+      {deleteTarget && (
+        <ConfirmDeleteModal itemLabel={deleteTarget.label} onConfirm={confirmDeleteOrder} onCancel={() => setDeleteTarget(null)} />
+      )}
     </div>
   );
 }
@@ -1096,6 +1183,17 @@ function CRMView({ orders, setOrders }) {
 // ─── FINANCE ─────────────────────────────────────────────────────────────────
 function FinanceView({ transactions, setTransactions, cars }) {
   const [form, setForm] = useState({ type: "DP", amount: "", date: new Date().toISOString().split("T")[0], notes: "", category: "Pemasukan", carId: "", carPlateSearch: "", namaPenyetor: "" });
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const confirmDeleteTx = async () => {
+    try {
+      await deleteDoc(doc(db, "transactions", deleteTarget.id));
+    } catch (e) {
+      alert("Gagal menghapus.");
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
 
   const pemasukan = transactions.filter(t => t.category === "Pemasukan").reduce((s, t) => s + t.amount, 0);
   const pengeluaran = transactions.filter(t => t.category === "Pengeluaran").reduce((s, t) => s + t.amount, 0);
@@ -1229,7 +1327,7 @@ function FinanceView({ transactions, setTransactions, cars }) {
                         🧾 Preview
                       </button>
                     )}
-                    <button onClick={() => deleteDoc(doc(db, "transactions", tx.id)).catch(() => alert("Gagal menghapus."))} style={{ background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 16 }}>×</button>
+                    <button onClick={() => setDeleteTarget({ id: tx.id, label: `transaksi "${tx.notes || tx.type}"` })} style={{ background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 16 }}>×</button>
                   </div>
                 );
               })}
@@ -1237,6 +1335,10 @@ function FinanceView({ transactions, setTransactions, cars }) {
           </div>
         </div>
       </div>
+
+      {deleteTarget && (
+        <ConfirmDeleteModal itemLabel={deleteTarget.label} onConfirm={confirmDeleteTx} onCancel={() => setDeleteTarget(null)} />
+      )}
     </div>
   );
 }
