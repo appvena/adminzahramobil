@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.0.1";
+const APP_VERSION = "3.0.2";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
@@ -59,10 +59,12 @@ async function generateKwitansiPDF(tx, car) {
   await loadScript([
     "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js",
     "https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js",
   ], "PDFLib");
   await loadScript([
-    "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js",
-    "https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js",
+    "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js",
+    "https://unpkg.com/qrcode@1.5.4/build/qrcode.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.4.4/qrcode.min.js",
   ], "QRCode");
 
   const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
