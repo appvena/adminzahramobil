@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.7.0";
+const APP_VERSION = "3.9.0";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
@@ -138,67 +138,77 @@ async function generateKwitansiPDF(tx, car) {
   page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: rgb(0.98, 0.97, 0.94) });
 
   const drawRow = (offsetYTop, rowH, label) => {
-    const pad = 18;
+    const pad = 24;
     const top = PAGE_H - offsetYTop; // y absolut bagian atas baris ini
     const bottom = top - rowH;
-    let y = top - 16;
+    let y = top - 22;
     const xLeft = pad;
     const xRight = PAGE_W - pad;
-    const colMid = pad + 280; // kolom tengah (data) mulai di sini
-    const colRight = PAGE_W - pad - 130; // kolom kanan (QR) mulai di sini
+    const colMid = pad + 340; // kolom tengah (data) mulai di sini
+    const colRight = PAGE_W - pad - 150; // kolom kanan (QR) mulai di sini
 
-    // Frame kotak mengelilingi kwitansi, dengan jarak dari tepi kertas (bukan menempel)
-    const frameMargin = 18;
+    // Frame kotak mengelilingi kwitansi, dengan jarak cukup jauh dari tepi kertas
+    const frameMargin = 26;
+    const frameX = frameMargin, frameY = bottom + frameMargin;
+    const frameW = PAGE_W - frameMargin * 2, frameH = rowH - frameMargin * 2;
     page.drawRectangle({
-      x: frameMargin, y: bottom + frameMargin,
-      width: PAGE_W - frameMargin * 2, height: rowH - frameMargin * 2,
-      color: rgb(1, 1, 1), borderColor: rgb(0.55, 0.46, 0.22), borderWidth: 1.2,
+      x: frameX, y: frameY, width: frameW, height: frameH,
+      color: rgb(1, 1, 1), borderColor: rgb(0.55, 0.46, 0.22), borderWidth: 1.3,
     });
 
-    // Watermark: pola teks "ZAHRA MOBIL ASLI" berulang diagonal, pudar dan menutupi PENUH area frame
-    const wmText = "ZAHRA MOBIL ASLI ";
-    const wmFull = wmText.repeat(24);
-    for (let wy = bottom - 40; wy < top + 40; wy += 11) {
-      page.drawText(wmFull, { x: frameMargin - 80, y: wy, size: 5.5, font: fontBold, color: rgb(0.85, 0.8, 0.62), rotate: window.PDFLib.degrees(18), opacity: 0.22 });
+    // Watermark: pola teks "ZAHRA MOBIL" horizontal berulang rapat, sangat pudar, menutupi PENUH area frame
+    const wmText = "ZAHRA MOBIL  ";
+    const wmFull = wmText.repeat(14);
+    for (let wy = frameY + 8; wy < frameY + frameH - 4; wy += 9) {
+      page.drawText(wmFull, { x: frameX + 6, y: wy, size: 6, font: fontBold, color: rgb(0.88, 0.84, 0.7), opacity: 0.5, maxWidth: frameW - 12 });
     }
 
     // Kolom kiri: logo + nama showroom + judul kwitansi
     if (logoImg) {
-      const logoDims = logoImg.scale(30 / logoImg.height);
-      page.drawImage(logoImg, { x: xLeft, y: y - 24, width: logoDims.width, height: 30 });
+      const logoDims = logoImg.scale(36 / logoImg.height);
+      page.drawImage(logoImg, { x: xLeft, y: y - 30, width: logoDims.width, height: 36 });
     }
-    page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: xLeft + 40, y: y - 4, size: 11, font: fontBold, color: dark });
-    page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: xLeft + 40, y: y - 15, size: 5.5, font: fontRegular, color: muted, maxWidth: 230 });
-    page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: xLeft + 40, y: y - 24, size: 5.5, font: fontRegular, color: muted });
+    page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: xLeft + 48, y: y - 6, size: 13, font: fontBold, color: dark });
+    page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: xLeft + 48, y: y - 18, size: 6.2, font: fontRegular, color: muted, maxWidth: 280 });
+    page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: xLeft + 48, y: y - 28, size: 6.2, font: fontRegular, color: muted });
 
-    let yL = y - 46;
-    page.drawText("KWITANSI PEMBAYARAN", { x: xLeft, y: yL, size: 10, font: fontBold, color: dark });
-    yL -= 11;
-    page.drawText(`NO: ${tx.id?.slice(0, 8).toUpperCase() || "-"}`, { x: xLeft, y: yL, size: 6, font: fontRegular, color: muted });
-    yL -= 9;
-    page.drawText(txDate.toUpperCase(), { x: xLeft, y: yL, size: 6, font: fontRegular, color: muted });
-    yL -= 14;
-    page.drawText("JUMLAH DIBAYAR", { x: xLeft, y: yL, size: 7, font: fontBold, color: dark });
+    let yL = y - 56;
+    page.drawText("KWITANSI PEMBAYARAN", { x: xLeft, y: yL, size: 12, font: fontBold, color: dark });
     yL -= 13;
-    page.drawText(fmtPdf(tx.amount || 0), { x: xLeft, y: yL, size: 14, font: fontBold, color: gold });
-    yL -= 14;
-    page.drawText(terbilangText, { x: xLeft, y: yL, size: 5.6, font: fontItalic, color: dark, maxWidth: 250, lineHeight: 7 });
+    page.drawText(`NO: ${tx.id?.slice(0, 8).toUpperCase() || "-"}`, { x: xLeft, y: yL, size: 7, font: fontRegular, color: muted });
+    yL -= 11;
+    page.drawText(txDate.toUpperCase(), { x: xLeft, y: yL, size: 7, font: fontRegular, color: muted });
+    yL -= 18;
+    page.drawText("JUMLAH DIBAYAR", { x: xLeft, y: yL, size: 8, font: fontBold, color: dark });
+    yL -= 18;
+    page.drawText(fmtPdf(tx.amount || 0), { x: xLeft, y: yL, size: 18, font: fontBold, color: gold });
+    yL -= 22;
+
+    // Kotak terbilang ala kwitansi pasar: label "TERBILANG" di atas, teks italic di dalam kotak bergaris
+    const terbilangBoxW = 290, terbilangBoxH = 30;
+    page.drawText("TERBILANG", { x: xLeft, y: yL, size: 6.5, font: fontBold, color: muted });
+    yL -= 4;
+    page.drawLine({ start: { x: xLeft, y: yL }, end: { x: xLeft + terbilangBoxW, y: yL }, thickness: 0.8, color: dark });
+    const terbilangBody = `${terbilang(tx.amount || 0).toUpperCase()} RUPIAH`;
+    page.drawText(terbilangBody, { x: xLeft + 4, y: yL - 11, size: 8, font: fontItalic, color: dark, maxWidth: terbilangBoxW - 8, lineHeight: 10 });
+    yL -= terbilangBoxH;
+    page.drawLine({ start: { x: xLeft, y: yL }, end: { x: xLeft + terbilangBoxW, y: yL }, thickness: 0.8, color: dark });
 
     // Kolom tengah: detail transaksi + data kendaraan
     let yM = y;
     const rowM = (lbl, value, bold = false) => {
-      page.drawText(lbl.toUpperCase(), { x: colMid, y: yM, size: 6, font: fontRegular, color: muted });
-      page.drawText(String(value || "-").toUpperCase(), { x: colMid + 70, y: yM, size: 6, font: bold ? fontBold : fontRegular, color: dark, maxWidth: colRight - colMid - 70 - 10 });
-      yM -= 11;
+      page.drawText(lbl.toUpperCase(), { x: colMid, y: yM, size: 7, font: fontRegular, color: muted });
+      page.drawText(String(value || "-").toUpperCase(), { x: colMid + 82, y: yM, size: 7, font: bold ? fontBold : fontRegular, color: dark, maxWidth: colRight - colMid - 82 - 14 });
+      yM -= 14;
     };
     rowM("Jenis", `${safeText(tx.category)} - ${safeText(tx.type)}`);
     rowM("Keterangan", safeText(tx.notes));
-    yM -= 4;
+    yM -= 6;
     if (car) {
-      page.drawLine({ start: { x: colMid, y: yM }, end: { x: colRight - 10, y: yM }, thickness: 0.4, color: lineGray });
-      yM -= 11;
-      page.drawText("DATA KENDARAAN", { x: colMid, y: yM, size: 6.2, font: fontBold, color: gold });
-      yM -= 11;
+      page.drawLine({ start: { x: colMid, y: yM }, end: { x: colRight - 14, y: yM }, thickness: 0.5, color: lineGray });
+      yM -= 14;
+      page.drawText("DATA KENDARAAN", { x: colMid, y: yM, size: 7.5, font: fontBold, color: gold });
+      yM -= 14;
       rowM("Unit", `${safeText(car.brand)} ${safeText(car.model)}`);
       rowM("No. Polisi", safeText(car.noPolisi));
       rowM("No. Rangka", safeText(car.noRangka));
@@ -209,37 +219,36 @@ async function generateKwitansiPDF(tx, car) {
 
     // Kolom kanan: QR code saja, bersih tanpa teks tambahan
     if (qrImg) {
-      const qrSize = 62;
-      page.drawImage(qrImg, { x: colRight, y: y - qrSize + 6, width: qrSize, height: qrSize });
+      const qrSize = 84;
+      page.drawImage(qrImg, { x: colRight, y: y - qrSize + 10, width: qrSize, height: qrSize });
     }
 
     // Baris tanda tangan - di BAWAH, terpisah jauh dari QR, full width 2 kolom
-    const sigLineY = bottom + 36;
-    const sigLabelY = bottom + 46;
-    const sigNameY = bottom + 25;
-    const sigColW = (PAGE_W - frameMargin * 2 - pad * 2 - 20) / 2;
-    const sig1X = xLeft;
-    const sig2X = xLeft + sigColW + 20;
+    const sigLineY = frameY + 46;
+    const sigLabelY = frameY + 60;
+    const sigNameY = frameY + 32;
+    const sigColW = (frameW - 28 * 2 - 24) / 2;
+    const sig1X = frameX + 28;
+    const sig2X = sig1X + sigColW + 24;
 
-    page.drawLine({ start: { x: xLeft, y: bottom + 58 }, end: { x: xRight, y: bottom + 58 }, thickness: 0.4, color: lineGray });
+    page.drawLine({ start: { x: frameX + 14, y: frameY + 76 }, end: { x: frameX + frameW - 14, y: frameY + 76 }, thickness: 0.5, color: lineGray });
 
-    page.drawText("DIBAYAR OLEH (KONSUMEN)", { x: sig1X, y: sigLabelY, size: 5.8, font: fontRegular, color: muted });
-    page.drawLine({ start: { x: sig1X, y: sigLineY }, end: { x: sig1X + sigColW, y: sigLineY }, thickness: 0.6, color: dark });
-    page.drawText(`( ${safeText(tx.namaPenyetor).toUpperCase() || "....................."} )`, { x: sig1X, y: sigNameY, size: 5.8, font: fontRegular, color: dark });
+    page.drawText("DIBAYAR OLEH (KONSUMEN)", { x: sig1X, y: sigLabelY, size: 7, font: fontRegular, color: muted });
+    page.drawLine({ start: { x: sig1X, y: sigLineY }, end: { x: sig1X + sigColW, y: sigLineY }, thickness: 0.7, color: dark });
+    page.drawText(`( ${safeText(tx.namaPenyetor).toUpperCase() || "....................."} )`, { x: sig1X, y: sigNameY, size: 7, font: fontRegular, color: dark });
 
-    page.drawText("DITERIMA OLEH - ZAHRA MOBIL (TTD & STEMPEL)", { x: sig2X, y: sigLabelY, size: 5.8, font: fontRegular, color: muted });
-    page.drawLine({ start: { x: sig2X, y: sigLineY }, end: { x: sig2X + sigColW, y: sigLineY }, thickness: 0.6, color: dark });
-    page.drawText("(.....................)", { x: sig2X, y: sigNameY, size: 5.8, font: fontRegular, color: dark });
+    page.drawText("DITERIMA OLEH - ZAHRA MOBIL (TTD & STEMPEL)", { x: sig2X, y: sigLabelY, size: 7, font: fontRegular, color: muted });
+    page.drawLine({ start: { x: sig2X, y: sigLineY }, end: { x: sig2X + sigColW, y: sigLineY }, thickness: 0.7, color: dark });
+    page.drawText("(.....................)", { x: sig2X, y: sigNameY, size: 7, font: fontRegular, color: dark });
 
-    // Footer: ucapan terima kasih (kiri) + label lampiran (kanan, jauh dari QR)
-    page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA KEPADA ZAHRA MOBIL.", { x: xLeft, y: bottom + 14, size: 5, font: fontRegular, color: muted });
-    page.drawText(label, { x: xRight - fontBold.widthOfTextAtSize(label, 6.5), y: bottom + 14, size: 6.5, font: fontBold, color: gold });
+    // Footer: ucapan terima kasih (kiri) + label lampiran (kanan, jauh dari QR) - DI DALAM frame
+    page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA KEPADA ZAHRA MOBIL.", { x: frameX + 14, y: frameY + 10, size: 6, font: fontRegular, color: muted });
+    page.drawText(label, { x: frameX + frameW - 14 - fontBold.widthOfTextAtSize(label, 7.5), y: frameY + 10, size: 7.5, font: fontBold, color: gold });
   };
 
-  const rowH = PAGE_H / 3;
+  const rowH = PAGE_H / 2;
   drawRow(0, rowH, "LAMPIRAN 1 - KONSUMEN");
   drawRow(rowH, rowH, "LAMPIRAN 2 - SHOWROOM");
-  drawRow(rowH * 2, rowH, "LAMPIRAN 3 - CADANGAN");
 
   // Garis putus-putus pemisah HORIZONTAL antar baris + tulisan gunting
   const drawCutLine = (yPos) => {
@@ -252,7 +261,6 @@ async function generateKwitansiPDF(tx, car) {
     page.drawText("- - GUNTING DI SINI - -", { x: PAGE_W / 2 - 50, y: yPos - 8, size: 6, font: fontItalic, color: rgb(0.55, 0.55, 0.55) });
   };
   drawCutLine(PAGE_H - rowH);
-  drawCutLine(PAGE_H - rowH * 2);
 
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([pdfBytes], { type: "application/pdf" });
@@ -394,6 +402,7 @@ const NAV = [
   { key: "inventaris", icon: "🚗", label: "Inventaris" },
   { key: "crm", icon: "🎯", label: "Sales CRM" },
   { key: "finance", icon: "💰", label: "Finance" },
+  { key: "export", icon: "📦", label: "Export & Backup" },
 ];
 
 function Sidebar({ active, setActive, onLogout }) {
@@ -1400,6 +1409,213 @@ function LoginScreen({ onLoginSuccess }) {
 }
 
 // ─── APP ─────────────────────────────────────────────────────────────────────
+// ─── EXPORT & BACKUP ───────────────────────────────────────────────────────────
+function ExportView({ cars, orders, transactions }) {
+  const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState({ brand: "", type: "", status: "", tahunMin: "", tahunMax: "" });
+  const [busy, setBusy] = useState(false);
+
+  const brands = [...new Set(cars.map(c => c.brand).filter(Boolean))].sort();
+  const types = [...new Set(cars.map(c => c.type).filter(Boolean))].sort();
+
+  const filteredCars = cars.filter(c => {
+    if (filters.brand && c.brand !== filters.brand) return false;
+    if (filters.type && c.type !== filters.type) return false;
+    if (filters.status && c.status !== filters.status) return false;
+    if (filters.tahunMin && Number(c.year) < Number(filters.tahunMin)) return false;
+    if (filters.tahunMax && Number(c.year) > Number(filters.tahunMax)) return false;
+    return true;
+  });
+
+  const resetFilters = () => setFilters({ brand: "", type: "", status: "", tahunMin: "", tahunMax: "" });
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+
+  const exportColumns = [
+    ["Merek", c => c.brand], ["Type", c => c.model], ["Model", c => c.type],
+    ["No. Polisi", c => c.noPolisi], ["No. Rangka", c => c.noRangka], ["No. Mesin", c => c.noMesin],
+    ["Tahun", c => c.year], ["Warna", c => c.color], ["Transmisi", c => c.transmission], ["BBM", c => c.fuel],
+    ["KM", c => c.km], ["Harga Beli", c => c.priceBeli], ["Harga Jual", c => c.price], ["Status", c => c.status],
+  ];
+
+  const handleExportExcel = async () => {
+    setBusy(true);
+    try {
+      await loadScript([
+        "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+        "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
+      ], "XLSX");
+      const headers = exportColumns.map(c => c[0]);
+      const rows = filteredCars.map(c => exportColumns.map(col => col[1](c)));
+      const ws = window.XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      // AutoFilter aktif di seluruh range data, supaya saat dibuka di Excel/Sheets sudah ada dropdown filter per kolom
+      ws["!autofilter"] = { ref: `A1:${window.XLSX.utils.encode_col(headers.length - 1)}${rows.length + 1}` };
+      ws["!cols"] = headers.map(h => ({ wch: Math.max(12, h.length + 2) }));
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, "Data Unit");
+      window.XLSX.writeFile(wb, `Data_Unit_ZahraMobil_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } catch (e) {
+      alert("Gagal membuat file Excel: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setBusy(true);
+    try {
+      await loadScript([
+        "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js",
+        "https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js",
+      ], "PDFLib");
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const pdfDoc = await PDFDocument.create();
+      const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const PAGE_W = 842, PAGE_H = 595;
+      const cols = exportColumns;
+      const colW = (PAGE_W - 60) / cols.length;
+      const rowsPerPage = 20;
+
+      for (let p = 0; p < Math.ceil(filteredCars.length / rowsPerPage) || 1; p++) {
+        const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+        page.drawText("DAFTAR UNIT KENDARAAN - ZAHRA MOBIL", { x: 30, y: PAGE_H - 30, size: 13, font: fontBold, color: rgb(0.16, 0.16, 0.16) });
+        page.drawText(`Dicetak: ${new Date().toLocaleDateString("id-ID")} | Total: ${filteredCars.length} unit | Halaman ${p + 1}`, { x: 30, y: PAGE_H - 44, size: 8, font: fontRegular, color: rgb(0.45, 0.45, 0.45) });
+        let y = PAGE_H - 64;
+        cols.forEach((col, i) => page.drawText(safeText(col[0]).toUpperCase(), { x: 30 + i * colW, y, size: 7, font: fontBold, color: rgb(0.79, 0.66, 0.30), maxWidth: colW - 4 }));
+        y -= 4;
+        page.drawLine({ start: { x: 30, y }, end: { x: PAGE_W - 30, y }, thickness: 0.8, color: rgb(0.79, 0.66, 0.30) });
+        y -= 12;
+        const pageCars = filteredCars.slice(p * rowsPerPage, (p + 1) * rowsPerPage);
+        pageCars.forEach(c => {
+          cols.forEach((col, i) => {
+            const val = col[1](c);
+            const text = safeText(typeof val === "number" ? val.toLocaleString("id-ID") : val).toUpperCase();
+            page.drawText(text, { x: 30 + i * colW, y, size: 6.5, font: fontRegular, color: rgb(0.16, 0.16, 0.16), maxWidth: colW - 4 });
+          });
+          y -= 14;
+        });
+      }
+
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      alert("Gagal membuat PDF: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleBackupJSON = (collectionName, data) => {
+    const json = JSON.stringify(data, (key, value) => {
+      // Konversi Firestore Timestamp jadi string ISO supaya valid JSON
+      if (value && typeof value === "object" && typeof value.toDate === "function") return value.toDate().toISOString();
+      return value;
+    }, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Backup_${collectionName}_ZahraMobil_${new Date().toISOString().split("T")[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  return (
+    <div style={{ padding: 28 }}>
+      {/* Filter Unit - terbuka/tertutup saat diklik */}
+      <div style={{ ...card, marginBottom: 20, overflow: "hidden" }}>
+        <button onClick={() => setFilterOpen(o => !o)} style={{ width: "100%", padding: "16px 20px", background: "none", border: "none", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: xpFont }}>
+          <span style={{ color: T.text, fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+            🔍 Filter Data Unit
+            {activeFilterCount > 0 && <span style={{ background: T.accent, color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "2px 7px" }}>{activeFilterCount}</span>}
+          </span>
+          <span style={{ color: T.muted, fontSize: 12 }}>{filterOpen ? "▲ Tutup" : "▼ Buka"}</span>
+        </button>
+        {filterOpen && (
+          <div style={{ padding: "0 20px 20px", borderTop: `1px solid ${T.border}` }}>
+            <div className="zm-form-grid3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16 }}>
+              <div>
+                <label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Merek</label>
+                <select style={inp} value={filters.brand} onChange={e => setFilters(f => ({ ...f, brand: e.target.value }))}>
+                  <option value="">Semua Merek</option>
+                  {brands.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Model (Body)</label>
+                <select style={inp} value={filters.type} onChange={e => setFilters(f => ({ ...f, type: e.target.value }))}>
+                  <option value="">Semua Model</option>
+                  {types.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Status</label>
+                <select style={inp} value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
+                  <option value="">Semua Status</option>
+                  {STATUS_OPTS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Tahun Min</label>
+                <input style={inp} type="number" value={filters.tahunMin} onChange={e => setFilters(f => ({ ...f, tahunMin: e.target.value }))} placeholder="2018" />
+              </div>
+              <div>
+                <label style={{ color: T.muted, fontSize: 11, display: "block", marginBottom: 5 }}>Tahun Max</label>
+                <input style={inp} type="number" value={filters.tahunMax} onChange={e => setFilters(f => ({ ...f, tahunMax: e.target.value }))} placeholder="2026" />
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end" }}>
+                <button onClick={resetFilters} style={{ width: "100%", padding: "9px", ...xpBtn(false), fontSize: 12, cursor: "pointer" }}>Reset Filter</button>
+              </div>
+            </div>
+            <div style={{ marginTop: 14, color: T.muted, fontSize: 12 }}>
+              Menampilkan <b style={{ color: T.accent }}>{filteredCars.length}</b> dari {cars.length} unit
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Export Data Unit */}
+      <div style={{ ...card, padding: "20px 24px", marginBottom: 20 }}>
+        <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6 }}>Export Data Unit ({filteredCars.length} unit sesuai filter)</div>
+        <div style={{ color: T.muted, fontSize: 12, marginBottom: 16 }}>File Excel sudah dilengkapi filter dropdown otomatis di tiap kolom (AutoFilter), siap dipakai langsung saat dibuka.</div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button onClick={handleExportExcel} disabled={busy} style={{ padding: "10px 18px", ...xpBtn(true), fontSize: 13, fontWeight: 700, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>
+            📊 Export Excel (.xlsx)
+          </button>
+          <button onClick={handleExportPDF} disabled={busy} style={{ padding: "10px 18px", ...xpBtn(false), fontSize: 13, fontWeight: 700, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>
+            📄 Export PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Backup JSON per collection */}
+      <div style={{ ...card, padding: "20px 24px" }}>
+        <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6 }}>Backup Database (JSON)</div>
+        <div style={{ color: T.muted, fontSize: 12, marginBottom: 16 }}>Backup mentah dari Firestore, per collection. Simpan sebagai cadangan jika sewaktu-waktu data perlu dipulihkan.</div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button onClick={() => handleBackupJSON("cars", cars)} style={{ padding: "10px 18px", ...xpBtn(false), fontSize: 13, cursor: "pointer" }}>
+            🚗 Backup Inventaris ({cars.length})
+          </button>
+          <button onClick={() => handleBackupJSON("orders", orders)} style={{ padding: "10px 18px", ...xpBtn(false), fontSize: 13, cursor: "pointer" }}>
+            🎯 Backup Pesanan ({orders.length})
+          </button>
+          <button onClick={() => handleBackupJSON("transactions", transactions)} style={{ padding: "10px 18px", ...xpBtn(false), fontSize: 13, cursor: "pointer" }}>
+            💰 Backup Transaksi ({transactions.length})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ZahraMobilAdmin() {
   const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState(null);
@@ -1436,7 +1652,7 @@ export default function ZahraMobilAdmin() {
     return () => { unsubCars(); unsubOrders(); unsubTx(); unsubStorage(); };
   }, [user]);
 
-  const titles = { dashboard: "Dashboard Overview", inventaris: "Manajemen Inventaris", crm: "Sales CRM — Kanban Board", finance: "Modul Finance" };
+  const titles = { dashboard: "Dashboard Overview", inventaris: "Manajemen Inventaris", crm: "Sales CRM — Kanban Board", finance: "Modul Finance", export: "Export & Backup Data" };
 
   if (!authChecked) {
     return (
@@ -1491,6 +1707,7 @@ export default function ZahraMobilAdmin() {
           {page === "inventaris" && <InventarisView cars={cars} setCars={setCars} />}
           {page === "crm" && <CRMView orders={orders} setOrders={setOrders} />}
           {page === "finance" && <FinanceView transactions={transactions} setTransactions={setTransactions} cars={cars} />}
+          {page === "export" && <ExportView cars={cars} orders={orders} transactions={transactions} />}
         </main>
       </div>
     </div>
