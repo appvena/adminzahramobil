@@ -18,9 +18,29 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.0.2";
+const APP_VERSION = "3.1.0";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
+
+// Konversi angka jadi teks terbilang Bahasa Indonesia (untuk kwitansi formal)
+function terbilang(n) {
+  n = Math.floor(Math.abs(n));
+  if (n === 0) return "Nol";
+  const satuan = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
+  const convert = (num) => {
+    if (num < 12) return satuan[num];
+    if (num < 20) return convert(num - 10) + " Belas";
+    if (num < 100) return convert(Math.floor(num / 10)) + " Puluh" + (num % 10 ? " " + convert(num % 10) : "");
+    if (num < 200) return "Seratus" + (num % 100 ? " " + convert(num % 100) : "");
+    if (num < 1000) return convert(Math.floor(num / 100)) + " Ratus" + (num % 100 ? " " + convert(num % 100) : "");
+    if (num < 2000) return "Seribu" + (num % 1000 ? " " + convert(num % 1000) : "");
+    if (num < 1e6) return convert(Math.floor(num / 1000)) + " Ribu" + (num % 1000 ? " " + convert(num % 1000) : "");
+    if (num < 1e9) return convert(Math.floor(num / 1e6)) + " Juta" + (num % 1e6 ? " " + convert(num % 1e6) : "");
+    if (num < 1e12) return convert(Math.floor(num / 1e9)) + " Miliar" + (num % 1e9 ? " " + convert(num % 1e9) : "");
+    return convert(Math.floor(num / 1e12)) + " Triliun" + (num % 1e12 ? " " + convert(num % 1e12) : "");
+  };
+  return convert(n).replace(/\s+/g, " ").trim();
+}
 const CLOUDINARY_CLOUD_NAME = "dtpow34rz";
 const CLOUDINARY_UPLOAD_PRESET = "zahramobil_unsigned";
 const STORAGE_LIMIT_GB = 20; // Batas aman yang ditetapkan (kuota asli Cloudinary 25GB, kita pasang ambang 20GB)
@@ -69,14 +89,16 @@ async function generateKwitansiPDF(tx, car) {
 
   const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([420, 595]); // ukuran setengah A4, mirip struk/kwitansi formal
+  const page = pdfDoc.addPage([420, 650]); // diperpanjang sedikit untuk muat kolom tanda tangan
   const { width, height } = page.getSize();
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
 
   const gold = rgb(0.79, 0.66, 0.30);
   const dark = rgb(0.16, 0.16, 0.16);
   const muted = rgb(0.45, 0.45, 0.45);
+  const lineGray = rgb(0.85, 0.85, 0.85);
   let y = height - 40;
 
   // Header: logo + nama showroom
@@ -89,8 +111,8 @@ async function generateKwitansiPDF(tx, car) {
   } catch (e) { /* logo opsional, lanjut tanpa logo kalau gagal */ }
 
   page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: 95, y: y - 8, size: 16, font: fontBold, color: dark });
-  page.drawText(SHOWROOM_INFO.alamat, { x: 95, y: y - 22, size: 7.5, font: fontRegular, color: muted, maxWidth: 280 });
-  page.drawText(`Telp/WA: ${SHOWROOM_INFO.telepon}`, { x: 95, y: y - 33, size: 7.5, font: fontRegular, color: muted });
+  page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: 95, y: y - 22, size: 7.5, font: fontRegular, color: muted, maxWidth: 280 });
+  page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: 95, y: y - 33, size: 7.5, font: fontRegular, color: muted });
 
   y -= 60;
   page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 1.5, color: gold });
@@ -99,12 +121,12 @@ async function generateKwitansiPDF(tx, car) {
   page.drawText("KWITANSI PEMBAYARAN", { x: 40, y, size: 14, font: fontBold, color: dark });
   y -= 18;
   const txDate = tx.date ? new Date(tx.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-";
-  page.drawText(`No. Kwitansi: ${tx.id?.slice(0, 8).toUpperCase() || "—"}   |   Tanggal: ${txDate}`, { x: 40, y, size: 8.5, font: fontRegular, color: muted });
+  page.drawText(`NO. KWITANSI: ${tx.id?.slice(0, 8).toUpperCase() || "—"}   |   TANGGAL: ${txDate.toUpperCase()}`, { x: 40, y, size: 8.5, font: fontRegular, color: muted });
   y -= 30;
 
   const row = (label, value, bold = false) => {
-    page.drawText(label, { x: 40, y, size: 9.5, font: fontRegular, color: muted });
-    page.drawText(String(value || "—"), { x: 170, y, size: 9.5, font: bold ? fontBold : fontRegular, color: dark, maxWidth: 210 });
+    page.drawText(label.toUpperCase(), { x: 40, y, size: 9.5, font: fontRegular, color: muted });
+    page.drawText(String(value || "—").toUpperCase(), { x: 170, y, size: 9.5, font: bold ? fontBold : fontRegular, color: dark, maxWidth: 210 });
     y -= 18;
   };
 
@@ -113,11 +135,11 @@ async function generateKwitansiPDF(tx, car) {
   y -= 6;
 
   if (car) {
-    page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) });
+    page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 0.5, color: lineGray });
     y -= 18;
     page.drawText("DATA KENDARAAN", { x: 40, y, size: 10, font: fontBold, color: gold });
     y -= 18;
-    row("Unit", `${car.brand || ""} ${car.model || ""}`.toUpperCase());
+    row("Unit", `${car.brand || ""} ${car.model || ""}`);
     row("No. Polisi", car.noPolisi);
     row("Tahun / Warna", `${car.year || "—"} / ${car.color || "—"}`);
     row("Harga Unit", fmt(car.price || 0), true);
@@ -129,23 +151,43 @@ async function generateKwitansiPDF(tx, car) {
 
   page.drawText("JUMLAH DIBAYAR", { x: 40, y, size: 11, font: fontBold, color: dark });
   page.drawText(fmt(tx.amount || 0), { x: 40, y: y - 18, size: 18, font: fontBold, color: gold });
+  y -= 38;
 
-  // QR Code di kanan bawah, mengarah ke halaman detail mobil di Web Tamu
+  // Terbilang
+  const terbilangText = `TERBILANG: ${terbilang(tx.amount || 0).toUpperCase()} RUPIAH`;
+  page.drawText(terbilangText, { x: 40, y, size: 8.5, font: fontItalic, color: dark, maxWidth: width - 80 });
+  y -= 30;
+
+  // QR Code di kanan, mengarah ke halaman detail mobil di Web Tamu
+  const qrTopY = y;
   if (car) {
     try {
       const qrUrl = `${GUEST_SITE_URL}/?car=${car.id}`;
       const qrDataUrl = await window.QRCode.toDataURL(qrUrl, { width: 240, margin: 0 });
       const qrBytes = await fetch(qrDataUrl).then(r => r.arrayBuffer());
       const qrImg = await pdfDoc.embedPng(qrBytes);
-      const qrSize = 90;
-      page.drawImage(qrImg, { x: width - 40 - qrSize, y: 70, width: qrSize, height: qrSize });
-      page.drawText("Scan untuk lihat unit", { x: width - 40 - qrSize, y: 58, size: 7, font: fontRegular, color: muted });
+      const qrSize = 85;
+      page.drawImage(qrImg, { x: width - 40 - qrSize, y: qrTopY - qrSize, width: qrSize, height: qrSize });
+      page.drawText("SCAN UNTUK LIHAT UNIT", { x: width - 40 - qrSize, y: qrTopY - qrSize - 12, size: 6.5, font: fontRegular, color: muted });
     } catch (e) { /* QR opsional, lanjut tanpa QR kalau gagal */ }
   }
 
-  page.drawLine({ start: { x: 40, y: 50 }, end: { x: width - 40, y: 50 }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) });
-  page.drawText("Terima kasih atas kepercayaan Anda kepada Zahra Mobil.", { x: 40, y: 36, size: 7.5, font: fontRegular, color: muted });
-  page.drawText(`Dicetak otomatis oleh sistem · v${APP_VERSION}`, { x: 40, y: 26, size: 6.5, font: fontRegular, color: muted });
+  // Kolom tanda tangan
+  const sigY = qrTopY - 110;
+  page.drawLine({ start: { x: 40, y: sigY + 14 }, end: { x: width - 40, y: sigY + 14 }, thickness: 0.5, color: lineGray });
+  const sigBoxW = (width - 80 - 20) / 2;
+  page.drawText("DIBAYAR OLEH", { x: 40, y: sigY - 6, size: 8, font: fontRegular, color: muted });
+  page.drawLine({ start: { x: 40, y: sigY - 45 }, end: { x: 40 + sigBoxW, y: sigY - 45 }, thickness: 0.75, color: dark });
+  page.drawText(`( ${(tx.namaPembayar || "").toUpperCase() || "...................."} )`, { x: 40, y: sigY - 58, size: 8, font: fontRegular, color: dark });
+
+  page.drawText("DITERIMA OLEH", { x: 40 + sigBoxW + 20, y: sigY - 6, size: 8, font: fontRegular, color: muted });
+  page.drawLine({ start: { x: 40 + sigBoxW + 20, y: sigY - 45 }, end: { x: width - 40, y: sigY - 45 }, thickness: 0.75, color: dark });
+  page.drawText("( ADMIN / SALES ZAHRA MOBIL )", { x: 40 + sigBoxW + 20, y: sigY - 58, size: 8, font: fontRegular, color: dark });
+
+  const footerY = sigY - 85;
+  page.drawLine({ start: { x: 40, y: footerY }, end: { x: width - 40, y: footerY }, thickness: 0.5, color: lineGray });
+  page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA KEPADA ZAHRA MOBIL.", { x: 40, y: footerY - 14, size: 7.5, font: fontRegular, color: muted });
+  page.drawText(`DICETAK OTOMATIS OLEH SISTEM · V${APP_VERSION}`, { x: 40, y: footerY - 24, size: 6.5, font: fontRegular, color: muted });
 
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([pdfBytes], { type: "application/pdf" });
