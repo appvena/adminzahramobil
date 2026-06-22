@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.1.0";
+const APP_VERSION = "3.2.0";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
@@ -89,8 +89,9 @@ async function generateKwitansiPDF(tx, car) {
 
   const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([420, 650]); // diperpanjang sedikit untuk muat kolom tanda tangan
-  const { width, height } = page.getSize();
+  // Halaman landscape ukuran A4 (842 x 595), dibagi jadi 3 kolom slip kwitansi
+  const PAGE_W = 842, PAGE_H = 595;
+  const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
@@ -99,106 +100,133 @@ async function generateKwitansiPDF(tx, car) {
   const dark = rgb(0.16, 0.16, 0.16);
   const muted = rgb(0.45, 0.45, 0.45);
   const lineGray = rgb(0.85, 0.85, 0.85);
-  let y = height - 40;
 
-  // Header: logo + nama showroom
+  // Siapkan logo & QR sekali saja, dipakai ulang di tiap slip
+  let logoImg = null;
   try {
     const logoRes = await fetch("/adminzahramobil/logo.png");
     const logoBytes = await logoRes.arrayBuffer();
-    const logoImg = await pdfDoc.embedPng(logoBytes);
-    const logoDims = logoImg.scale(40 / logoImg.height);
-    page.drawImage(logoImg, { x: 40, y: y - 30, width: logoDims.width, height: 40 });
-  } catch (e) { /* logo opsional, lanjut tanpa logo kalau gagal */ }
+    logoImg = await pdfDoc.embedPng(logoBytes);
+  } catch (e) { /* logo opsional */ }
 
-  page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: 95, y: y - 8, size: 16, font: fontBold, color: dark });
-  page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: 95, y: y - 22, size: 7.5, font: fontRegular, color: muted, maxWidth: 280 });
-  page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: 95, y: y - 33, size: 7.5, font: fontRegular, color: muted });
-
-  y -= 60;
-  page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 1.5, color: gold });
-  y -= 26;
-
-  page.drawText("KWITANSI PEMBAYARAN", { x: 40, y, size: 14, font: fontBold, color: dark });
-  y -= 18;
-  const txDate = tx.date ? new Date(tx.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-";
-  page.drawText(`NO. KWITANSI: ${tx.id?.slice(0, 8).toUpperCase() || "—"}   |   TANGGAL: ${txDate.toUpperCase()}`, { x: 40, y, size: 8.5, font: fontRegular, color: muted });
-  y -= 30;
-
-  const row = (label, value, bold = false) => {
-    page.drawText(label.toUpperCase(), { x: 40, y, size: 9.5, font: fontRegular, color: muted });
-    page.drawText(String(value || "—").toUpperCase(), { x: 170, y, size: 9.5, font: bold ? fontBold : fontRegular, color: dark, maxWidth: 210 });
-    y -= 18;
-  };
-
-  row("Jenis Transaksi", `${tx.category} — ${tx.type}`);
-  row("Keterangan", tx.notes);
-  y -= 6;
-
-  if (car) {
-    page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 0.5, color: lineGray });
-    y -= 18;
-    page.drawText("DATA KENDARAAN", { x: 40, y, size: 10, font: fontBold, color: gold });
-    y -= 18;
-    row("Unit", `${car.brand || ""} ${car.model || ""}`);
-    row("No. Polisi", car.noPolisi);
-    row("Tahun / Warna", `${car.year || "—"} / ${car.color || "—"}`);
-    row("Harga Unit", fmt(car.price || 0), true);
-  }
-
-  y -= 10;
-  page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 1.5, color: gold });
-  y -= 26;
-
-  page.drawText("JUMLAH DIBAYAR", { x: 40, y, size: 11, font: fontBold, color: dark });
-  page.drawText(fmt(tx.amount || 0), { x: 40, y: y - 18, size: 18, font: fontBold, color: gold });
-  y -= 38;
-
-  // Terbilang
-  const terbilangText = `TERBILANG: ${terbilang(tx.amount || 0).toUpperCase()} RUPIAH`;
-  page.drawText(terbilangText, { x: 40, y, size: 8.5, font: fontItalic, color: dark, maxWidth: width - 80 });
-  y -= 30;
-
-  // QR Code di kanan, mengarah ke halaman detail mobil di Web Tamu
-  const qrTopY = y;
+  let qrImg = null;
   if (car) {
     try {
       const qrUrl = `${GUEST_SITE_URL}/?car=${car.id}`;
       const qrDataUrl = await window.QRCode.toDataURL(qrUrl, { width: 240, margin: 0 });
       const qrBytes = await fetch(qrDataUrl).then(r => r.arrayBuffer());
-      const qrImg = await pdfDoc.embedPng(qrBytes);
-      const qrSize = 85;
-      page.drawImage(qrImg, { x: width - 40 - qrSize, y: qrTopY - qrSize, width: qrSize, height: qrSize });
-      page.drawText("SCAN UNTUK LIHAT UNIT", { x: width - 40 - qrSize, y: qrTopY - qrSize - 12, size: 6.5, font: fontRegular, color: muted });
-    } catch (e) { /* QR opsional, lanjut tanpa QR kalau gagal */ }
+      qrImg = await pdfDoc.embedPng(qrBytes);
+    } catch (e) { /* QR opsional */ }
   }
 
-  // Kolom tanda tangan
-  const sigY = qrTopY - 110;
-  page.drawLine({ start: { x: 40, y: sigY + 14 }, end: { x: width - 40, y: sigY + 14 }, thickness: 0.5, color: lineGray });
-  const sigBoxW = (width - 80 - 20) / 2;
-  page.drawText("DIBAYAR OLEH", { x: 40, y: sigY - 6, size: 8, font: fontRegular, color: muted });
-  page.drawLine({ start: { x: 40, y: sigY - 45 }, end: { x: 40 + sigBoxW, y: sigY - 45 }, thickness: 0.75, color: dark });
-  page.drawText(`( ${(tx.namaPembayar || "").toUpperCase() || "...................."} )`, { x: 40, y: sigY - 58, size: 8, font: fontRegular, color: dark });
+  const txDate = tx.date ? new Date(tx.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-";
+  const terbilangText = `TERBILANG: ${terbilang(tx.amount || 0).toUpperCase()} RUPIAH`;
 
-  page.drawText("DITERIMA OLEH", { x: 40 + sigBoxW + 20, y: sigY - 6, size: 8, font: fontRegular, color: muted });
-  page.drawLine({ start: { x: 40 + sigBoxW + 20, y: sigY - 45 }, end: { x: width - 40, y: sigY - 45 }, thickness: 0.75, color: dark });
-  page.drawText("( ADMIN / SALES ZAHRA MOBIL )", { x: 40 + sigBoxW + 20, y: sigY - 58, size: 8, font: fontRegular, color: dark });
+  // Gambar 1 slip kwitansi lengkap, dimulai dari offsetX dengan lebar slipW
+  const drawSlip = (offsetX, slipW, label) => {
+    const pad = 18;
+    let y = PAGE_H - 28;
+    const x0 = offsetX + pad;
+    const xMax = offsetX + slipW - pad;
 
-  const footerY = sigY - 85;
-  page.drawLine({ start: { x: 40, y: footerY }, end: { x: width - 40, y: footerY }, thickness: 0.5, color: lineGray });
-  page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA KEPADA ZAHRA MOBIL.", { x: 40, y: footerY - 14, size: 7.5, font: fontRegular, color: muted });
-  page.drawText(`DICETAK OTOMATIS OLEH SISTEM · V${APP_VERSION}`, { x: 40, y: footerY - 24, size: 6.5, font: fontRegular, color: muted });
+    // Label lampiran (pojok kanan atas slip)
+    page.drawText(label, { x: xMax - fontBold.widthOfTextAtSize(label, 7) , y: PAGE_H - 16, size: 7, font: fontBold, color: gold });
+
+    // Header logo + nama
+    if (logoImg) {
+      const logoDims = logoImg.scale(28 / logoImg.height);
+      page.drawImage(logoImg, { x: x0, y: y - 22, width: logoDims.width, height: 28 });
+    }
+    page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: x0 + 38, y: y - 4, size: 11, font: fontBold, color: dark });
+    page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: x0 + 38, y: y - 15, size: 5.2, font: fontRegular, color: muted, maxWidth: slipW - 38 - pad });
+    page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: x0 + 38, y: y - 23, size: 5.2, font: fontRegular, color: muted });
+
+    y -= 42;
+    page.drawLine({ start: { x: x0, y }, end: { x: xMax, y }, thickness: 1.2, color: gold });
+    y -= 16;
+
+    page.drawText("KWITANSI PEMBAYARAN", { x: x0, y, size: 10, font: fontBold, color: dark });
+    y -= 12;
+    page.drawText(`NO: ${tx.id?.slice(0, 8).toUpperCase() || "—"}  |  ${txDate.toUpperCase()}`, { x: x0, y, size: 6, font: fontRegular, color: muted });
+    y -= 18;
+
+    const row = (lbl, value, bold = false) => {
+      page.drawText(lbl.toUpperCase(), { x: x0, y, size: 6.5, font: fontRegular, color: muted });
+      page.drawText(String(value || "—").toUpperCase(), { x: x0 + 78, y, size: 6.5, font: bold ? fontBold : fontRegular, color: dark, maxWidth: slipW - 78 - pad * 2 });
+      y -= 11;
+    };
+
+    row("Jenis", `${tx.category} — ${tx.type}`);
+    row("Keterangan", tx.notes);
+    y -= 4;
+
+    if (car) {
+      page.drawLine({ start: { x: x0, y }, end: { x: xMax, y }, thickness: 0.4, color: lineGray });
+      y -= 11;
+      page.drawText("DATA KENDARAAN", { x: x0, y, size: 6.5, font: fontBold, color: gold });
+      y -= 11;
+      row("Unit", `${car.brand || ""} ${car.model || ""}`);
+      row("No. Polisi", car.noPolisi);
+      row("Tahun/Warna", `${car.year || "—"} / ${car.color || "—"}`);
+      row("Harga Unit", fmt(car.price || 0), true);
+    }
+
+    y -= 6;
+    page.drawLine({ start: { x: x0, y }, end: { x: xMax, y }, thickness: 1.2, color: gold });
+    y -= 16;
+
+    page.drawText("JUMLAH DIBAYAR", { x: x0, y, size: 7, font: fontBold, color: dark });
+    y -= 14;
+    page.drawText(fmt(tx.amount || 0), { x: x0, y, size: 13, font: fontBold, color: gold });
+    y -= 16;
+
+    page.drawText(terbilangText, { x: x0, y, size: 5.5, font: fontItalic, color: dark, maxWidth: slipW - pad * 2, lineHeight: 7 });
+    y -= 24;
+
+    // QR di kanan slip
+    if (qrImg) {
+      const qrSize = 48;
+      page.drawImage(qrImg, { x: xMax - qrSize, y: y - qrSize + 14, width: qrSize, height: qrSize });
+      page.drawText("SCAN UNIT", { x: xMax - qrSize, y: y - qrSize + 2, size: 5, font: fontRegular, color: muted });
+    }
+
+    // Tanda tangan
+    const sigW = (slipW - pad * 2 - 10) / 2;
+    page.drawText("DIBAYAR OLEH", { x: x0, y: y - 4, size: 5.5, font: fontRegular, color: muted });
+    page.drawLine({ start: { x: x0, y: y - 30 }, end: { x: x0 + sigW, y: y - 30 }, thickness: 0.6, color: dark });
+    page.drawText("(.....................)", { x: x0, y: y - 39, size: 5.5, font: fontRegular, color: dark });
+
+    page.drawText("DITERIMA OLEH", { x: x0 + sigW + 10, y: y - 4, size: 5.5, font: fontRegular, color: muted });
+    page.drawLine({ start: { x: x0 + sigW + 10, y: y - 30 }, end: { x: xMax, y: y - 30 }, thickness: 0.6, color: dark });
+    page.drawText("(ADMIN/SALES)", { x: x0 + sigW + 10, y: y - 39, size: 5.5, font: fontRegular, color: dark });
+
+    page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA.", { x: x0, y: 16, size: 5, font: fontRegular, color: muted });
+  };
+
+  const slipW = PAGE_W / 3;
+  drawSlip(0, slipW, "LAMPIRAN 1 — KONSUMEN");
+  drawSlip(slipW, slipW, "LAMPIRAN 2 — SHOWROOM");
+  drawSlip(slipW * 2, slipW, "LAMPIRAN 3 — CADANGAN");
+
+  // Garis putus-putus pemisah antar slip + tulisan gunting
+  const drawCutLine = (x) => {
+    const dashLen = 4, gapLen = 3;
+    let yy = PAGE_H - 8;
+    while (yy > 8) {
+      page.drawLine({ start: { x, y: yy }, end: { x, y: Math.max(yy - dashLen, 8) }, thickness: 0.8, color: rgb(0.6, 0.6, 0.6) });
+      yy -= dashLen + gapLen;
+    }
+    page.drawText("✂ GUNTING DI SINI", { x: x - 38, y: PAGE_H / 2, size: 6.5, font: fontItalic, color: rgb(0.55, 0.55, 0.55), rotate: window.PDFLib.degrees(90) });
+  };
+  drawCutLine(slipW);
+  drawCutLine(slipW * 2);
 
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([pdfBytes], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `Kwitansi_${(car ? car.noPolisi : tx.id) || "transaksi"}.pdf`.replace(/\s/g, "_");
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  // Preview dulu di tab baru - TIDAK langsung download/save
+  window.open(url, "_blank");
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 // Catat estimasi pemakaian storage ke Firestore (collection "meta", dokumen "storage").
@@ -488,8 +516,8 @@ function DashboardView({ cars, orders, transactions, storageMeta }) {
               <div style={{ color: T.green, fontSize: 12, marginTop: 2 }}>↑ 18.4% vs bulan lalu</div>
             </div>
             <div style={{ display: "flex", gap: 16 }}>
-              <div><div style={{ color: T.muted, fontSize: 11, marginBottom: 2 }}>Pemasukan</div><div style={{ color: T.green, fontWeight: 700 }}>{fmtShort(totalOmset)}</div></div>
-              <div><div style={{ color: T.muted, fontSize: 11, marginBottom: 2 }}>Profit Unit</div><div style={{ color: T.gold, fontWeight: 700 }}>{fmtShort(totalProfit)}</div></div>
+              <div><div style={{ color: T.muted, fontSize: 11, marginBottom: 2 }}>Pemasukan</div><div style={{ color: T.green, fontWeight: 700 }}>{fmt(totalOmset)}</div></div>
+              <div><div style={{ color: T.muted, fontSize: 11, marginBottom: 2 }}>Profit Unit</div><div style={{ color: T.gold, fontWeight: 700 }}>{fmt(totalProfit)}</div></div>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 120 }}>
@@ -825,8 +853,8 @@ function InventarisView({ cars, setCars }) {
                   <div style={{ color: T.muted, fontSize: 12, marginTop: 2, textTransform: "uppercase" }}>{car.type} · {car.color}</div>
                 </td>
                 <td style={{ padding: "12px 16px", color: T.muted, fontSize: 12, fontFamily: "monospace", textTransform: "uppercase" }}>{car.noPolisi || "—"}</td>
-                <td style={{ padding: "12px 16px", color: T.gold, fontWeight: 700, fontSize: 14 }}>{fmtShort(car.price)}</td>
-                <td style={{ padding: "12px 16px", color: T.green, fontWeight: 600, fontSize: 13 }}>{car.priceBeli ? fmtShort(car.price - car.priceBeli) : "—"}</td>
+                <td style={{ padding: "12px 16px", color: T.gold, fontWeight: 700, fontSize: 14 }}>{fmt(car.price)}</td>
+                <td style={{ padding: "12px 16px", color: T.green, fontWeight: 600, fontSize: 13 }}>{car.priceBeli ? fmt(car.price - car.priceBeli) : "—"}</td>
                 <td style={{ padding: "12px 16px" }}>
                   <select value={car.status} onChange={e => updateDoc(doc(db, "cars", car.id), { status: e.target.value }).catch(() => alert("Gagal update status."))}
                     style={{ background: car.status === "Ready" ? `${T.green}22` : car.status === "Booking" ? `${T.amber}22` : "#fff", color: car.status === "Ready" ? T.green : car.status === "Booking" ? T.amber : T.muted, border: `1px solid ${car.status === "Ready" ? T.green : car.status === "Booking" ? T.amber : T.border}44`, borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -1055,16 +1083,16 @@ function FinanceView({ transactions, setTransactions, cars }) {
 
   const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box", textTransform: "uppercase" };
   const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun"];
-  const mockMonthly = [820, 1150, 690, 1420, 1680, pemasukan / 1e6];
+  const mockMonthly = [820000000, 1150000000, 690000000, 1420000000, 1680000000, pemasukan];
   const maxVal = Math.max(...mockMonthly);
 
   return (
     <div style={{ padding: 28 }}>
       <div className="zm-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        <StatCard icon="📈" label="Total Pemasukan" value={fmtShort(pemasukan)} sub="Bulan ini" color={T.green} />
-        <StatCard icon="📉" label="Total Pengeluaran" value={fmtShort(pengeluaran)} sub="Bulan ini" color={T.red} />
-        <StatCard icon="💎" label="Laba Bersih" value={fmtShort(laba)} sub={laba >= 0 ? "Surplus ✓" : "Defisit !"} color={laba >= 0 ? T.green : T.red} />
-        <StatCard icon="🏆" label="Profit per Unit" value={fmtShort(totalProfitUnit)} sub={`${soldCars.length} unit terjual`} color={T.gold} />
+        <StatCard icon="📈" label="Total Pemasukan" value={fmt(pemasukan)} sub="Bulan ini" color={T.green} />
+        <StatCard icon="📉" label="Total Pengeluaran" value={fmt(pengeluaran)} sub="Bulan ini" color={T.red} />
+        <StatCard icon="💎" label="Laba Bersih" value={fmt(laba)} sub={laba >= 0 ? "Surplus ✓" : "Defisit !"} color={laba >= 0 ? T.green : T.red} />
+        <StatCard icon="🏆" label="Profit per Unit" value={fmt(totalProfitUnit)} sub={`${soldCars.length} unit terjual`} color={T.gold} />
       </div>
 
       <div className="zm-fin-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 20, marginBottom: 24 }}>
@@ -1100,7 +1128,7 @@ function FinanceView({ transactions, setTransactions, cars }) {
                   <img src={selected.images?.[0]} alt="" style={{ width: 56, height: 40, objectFit: "cover", borderRadius: 3, flexShrink: 0 }} />
                   <div style={{ fontSize: 11.5, lineHeight: 1.5 }}>
                     <div style={{ fontWeight: 700, color: T.text, textTransform: "uppercase" }}>{selected.brand} {selected.model}</div>
-                    <div style={{ color: T.muted }}>No. Polisi: {selected.noPolisi} · {selected.status} · {fmtShort(selected.price)}</div>
+                    <div style={{ color: T.muted }}>No. Polisi: {selected.noPolisi} · {selected.status} · {fmt(selected.price)}</div>
                   </div>
                   <button type="button" onClick={() => setForm(f => ({ ...f, carId: "", carPlateSearch: "" }))} style={{ marginLeft: "auto", background: "none", border: "none", color: T.red, fontSize: 16, cursor: "pointer", padding: 4, flexShrink: 0 }}>×</button>
                 </div>
@@ -1123,7 +1151,7 @@ function FinanceView({ transactions, setTransactions, cars }) {
             <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 90 }}>
               {mockMonthly.map((val, i) => (
                 <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <span style={{ color: T.muted, fontSize: 9 }}>{val >= 1000 ? `${(val / 1000).toFixed(1)}M` : `${val}Jt`}</span>
+                  <span style={{ color: T.muted, fontSize: 7.5, whiteSpace: "nowrap" }}>{fmt(val)}</span>
                   <div style={{ width: "100%", background: i === mockMonthly.length - 1 ? T.green : `${T.green}55`, borderRadius: "3px 3px 0 0", height: `${(val / maxVal) * 72}px`, minHeight: 4 }} />
                   <span style={{ color: T.muted, fontSize: 10 }}>{months[i]}</span>
                 </div>
@@ -1137,7 +1165,7 @@ function FinanceView({ transactions, setTransactions, cars }) {
             {soldCars.length === 0 ? <div style={{ color: T.border, fontSize: 12, textAlign: "center", padding: "12px 0" }}>Belum ada unit terjual</div> : soldCars.map(c => (
               <div key={c.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.border}22` }}>
                 <span style={{ color: T.text, fontSize: 12.5 }}>{c.brand} {c.model} {c.noPolisi && <span style={{ color: T.muted, fontSize: 11 }}>({c.noPolisi})</span>}</span>
-                <span style={{ color: T.gold, fontWeight: 700, fontSize: 12.5 }}>+{fmtShort(c.price - c.priceBeli)}</span>
+                <span style={{ color: T.gold, fontWeight: 700, fontSize: 12.5 }}>+{fmt(c.price - c.priceBeli)}</span>
               </div>
             ))}
           </div>
@@ -1154,16 +1182,16 @@ function FinanceView({ transactions, setTransactions, cars }) {
                       <div style={{ color: T.text, fontSize: 13, fontWeight: 600 }}>{tx.notes}</div>
                       <div style={{ color: T.muted, fontSize: 11, marginTop: 2 }}>{tx.type} · {tx.date} {relatedCar && `· ${relatedCar.noPolisi || relatedCar.model}`}</div>
                     </div>
-                    <div style={{ color: tx.category === "Pemasukan" ? T.green : T.red, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap" }}>{tx.category === "Pemasukan" ? "+" : "−"}{fmtShort(tx.amount)}</div>
+                    <div style={{ color: tx.category === "Pemasukan" ? T.green : T.red, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap" }}>{tx.category === "Pemasukan" ? "+" : "−"}{fmt(tx.amount)}</div>
                     {relatedCar && tx.category === "Pemasukan" && (
                       <button onClick={async (e) => {
                         const btn = e.currentTarget;
                         btn.disabled = true; btn.textContent = "⏳...";
                         try { await generateKwitansiPDF(tx, relatedCar); }
                         catch (err) { alert("Gagal membuat kwitansi: " + err.message); }
-                        finally { btn.disabled = false; btn.textContent = "🧾 Cetak"; }
+                        finally { btn.disabled = false; btn.textContent = "🧾 Preview"; }
                       }} style={{ padding: "5px 10px", background: `${T.gold}22`, color: "#8a6d1f", border: `1px solid ${T.gold}66`, borderRadius: 4, fontSize: 11, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
-                        🧾 Cetak
+                        🧾 Preview
                       </button>
                     )}
                     <button onClick={() => deleteDoc(doc(db, "transactions", tx.id)).catch(() => alert("Gagal menghapus."))} style={{ background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 16 }}>×</button>
