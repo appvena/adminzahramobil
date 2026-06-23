@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "4.0.0";
+const APP_VERSION = "4.1.0";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
@@ -100,12 +100,19 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
 
   const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
   const pdfDoc = await PDFDocument.create();
-  // Halaman landscape A4 penuh, dibagi jadi 3 BARIS horizontal (bukan kolom) - tiap baris 1 lampiran
-  const PAGE_W = 842, PAGE_H = 595;
+  // Orientasi kertas bisa diatur: "landscape" (842x595, default) atau "portrait" (595x842), keduanya A4.
+  // Semua koordinat horizontal di dalam drawRow dihitung PROPORSIONAL terhadap PAGE_W,
+  // sehingga layout 3-kolom otomatis menyesuaikan skala ke lebar kertas yang dipilih.
+  const orientation = settings.orientation === "portrait" ? "portrait" : "landscape";
+  const PAGE_W = orientation === "portrait" ? 595 : 842;
+  const PAGE_H = orientation === "portrait" ? 842 : 595;
   const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+
+  // Skala proporsional relatif terhadap lebar referensi 842 (landscape) - dipakai untuk semua ukuran/posisi horizontal
+  const SCALE = PAGE_W / 842;
 
   const gold = rgb(0.79, 0.66, 0.30);
   const dark = rgb(0.16, 0.16, 0.16);
@@ -138,17 +145,17 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
   page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: rgb(0.98, 0.97, 0.94) });
 
   const drawRow = (offsetYTop, rowH, label) => {
-    const pad = 24;
+    const pad = 24 * SCALE;
     const top = PAGE_H - offsetYTop; // y absolut bagian atas baris ini
     const bottom = top - rowH;
     let y = top - 22;
     const xLeft = pad;
     const xRight = PAGE_W - pad;
-    const colMid = pad + 340; // kolom tengah (data) mulai di sini
-    const colRight = PAGE_W - pad - 150; // kolom kanan (QR) mulai di sini
+    const colMid = pad + 340 * SCALE; // kolom tengah (data) mulai di sini
+    const colRight = PAGE_W - pad - 150 * SCALE; // kolom kanan (QR) mulai di sini
 
     // Frame kotak mengelilingi kwitansi, dengan jarak cukup jauh dari tepi kertas
-    const frameMargin = settings.frameMargin ?? 26;
+    const frameMargin = (settings.frameMargin ?? 26) * SCALE;
     const frameX = frameMargin, frameY = bottom + frameMargin;
     const frameW = PAGE_W - frameMargin * 2, frameH = rowH - frameMargin * 2;
     page.drawRectangle({
@@ -178,9 +185,9 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
       const logoDims = logoImg.scale(36 / logoImg.height);
       page.drawImage(logoImg, { x: xLeft, y: y - 30, width: logoDims.width, height: 36 });
     }
-    page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: xLeft + 48, y: y - 6, size: 13, font: fontBold, color: dark });
-    page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: xLeft + 48, y: y - 18, size: 6.2, font: fontRegular, color: muted, maxWidth: 280 });
-    page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: xLeft + 48, y: y - 28, size: 6.2, font: fontRegular, color: muted });
+    page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: xLeft + 48 * SCALE, y: y - 6, size: 13, font: fontBold, color: dark });
+    page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: xLeft + 48 * SCALE, y: y - 18, size: 6.2, font: fontRegular, color: muted, maxWidth: 280 * SCALE });
+    page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: xLeft + 48 * SCALE, y: y - 28, size: 6.2, font: fontRegular, color: muted });
 
     let yL = y - 56;
     page.drawText("KWITANSI PEMBAYARAN", { x: xLeft, y: yL, size: 12, font: fontBold, color: dark });
@@ -195,7 +202,7 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
     yL -= 22;
 
     // Kotak terbilang ala kwitansi pasar: label "TERBILANG" di atas, teks italic di dalam kotak bergaris
-    const terbilangBoxW = 290, terbilangBoxH = 30;
+    const terbilangBoxW = 290 * SCALE, terbilangBoxH = 30;
     page.drawText("TERBILANG", { x: xLeft, y: yL, size: 6.5, font: fontBold, color: muted });
     yL -= 4;
     page.drawLine({ start: { x: xLeft, y: yL }, end: { x: xLeft + terbilangBoxW, y: yL }, thickness: 0.8, color: dark });
@@ -208,14 +215,14 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
     let yM = y;
     const rowM = (lbl, value, bold = false) => {
       page.drawText(lbl.toUpperCase(), { x: colMid, y: yM, size: 7, font: fontRegular, color: muted });
-      page.drawText(String(value || "-").toUpperCase(), { x: colMid + 82, y: yM, size: 7, font: bold ? fontBold : fontRegular, color: dark, maxWidth: colRight - colMid - 82 - 14 });
+      page.drawText(String(value || "-").toUpperCase(), { x: colMid + 82 * SCALE, y: yM, size: 7, font: bold ? fontBold : fontRegular, color: dark, maxWidth: colRight - colMid - 82 * SCALE - 14 * SCALE });
       yM -= 14;
     };
     rowM("Jenis", `${safeText(tx.category)} - ${safeText(tx.type)}`);
     rowM("Keterangan", safeText(tx.notes));
     yM -= 6;
     if (car) {
-      page.drawLine({ start: { x: colMid, y: yM }, end: { x: colRight - 14, y: yM }, thickness: 0.5, color: lineGray });
+      page.drawLine({ start: { x: colMid, y: yM }, end: { x: colRight - 14 * SCALE, y: yM }, thickness: 0.5, color: lineGray });
       yM -= 14;
       page.drawText("DATA KENDARAAN", { x: colMid, y: yM, size: 7.5, font: fontBold, color: gold });
       yM -= 14;
@@ -229,7 +236,7 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
 
     // Kolom kanan: QR code saja, bersih tanpa teks tambahan
     if (qrImg) {
-      const qrSize = 84;
+      const qrSize = 84 * SCALE;
       page.drawImage(qrImg, { x: colRight, y: y - qrSize + 10, width: qrSize, height: qrSize });
     }
 
@@ -237,11 +244,11 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
     const sigLineY = frameY + 46;
     const sigLabelY = frameY + 60;
     const sigNameY = frameY + 32;
-    const sigColW = (frameW - 28 * 2 - 24) / 2;
-    const sig1X = frameX + 28;
-    const sig2X = sig1X + sigColW + 24;
+    const sigColW = (frameW - 28 * SCALE * 2 - 24 * SCALE) / 2;
+    const sig1X = frameX + 28 * SCALE;
+    const sig2X = sig1X + sigColW + 24 * SCALE;
 
-    page.drawLine({ start: { x: frameX + 14, y: frameY + 76 }, end: { x: frameX + frameW - 14, y: frameY + 76 }, thickness: 0.5, color: lineGray });
+    page.drawLine({ start: { x: frameX + 14 * SCALE, y: frameY + 76 }, end: { x: frameX + frameW - 14 * SCALE, y: frameY + 76 }, thickness: 0.5, color: lineGray });
 
     page.drawText("DIBAYAR OLEH (KONSUMEN)", { x: sig1X, y: sigLabelY, size: 7, font: fontRegular, color: muted });
     page.drawLine({ start: { x: sig1X, y: sigLineY }, end: { x: sig1X + sigColW, y: sigLineY }, thickness: 0.7, color: dark });
@@ -252,8 +259,8 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
     page.drawText("(.....................)", { x: sig2X, y: sigNameY, size: 7, font: fontRegular, color: dark });
 
     // Footer: ucapan terima kasih (kiri) + label lampiran (kanan, jauh dari QR) - DI DALAM frame
-    page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA KEPADA ZAHRA MOBIL.", { x: frameX + 14, y: frameY + 10, size: 6, font: fontRegular, color: muted });
-    page.drawText(label, { x: frameX + frameW - 14 - fontBold.widthOfTextAtSize(label, 7.5), y: frameY + 10, size: 7.5, font: fontBold, color: gold });
+    page.drawText("TERIMA KASIH ATAS KEPERCAYAAN ANDA KEPADA ZAHRA MOBIL.", { x: frameX + 14 * SCALE, y: frameY + 10, size: 6, font: fontRegular, color: muted });
+    page.drawText(label, { x: frameX + frameW - 14 * SCALE - fontBold.widthOfTextAtSize(label, 7.5), y: frameY + 10, size: 7.5, font: fontBold, color: gold });
   };
 
   const rowCount = settings.rowCount ?? 2;
@@ -1640,7 +1647,7 @@ function ExportView({ cars, orders, transactions }) {
 }
 
 // ─── SETTING KWITANSI (atur layout, frame, watermark) ───────────────────────────
-const DEFAULT_KWITANSI_SETTINGS = { rowCount: 2, frameMargin: 26, watermark: { gapY: 9, opacity: 0.5 } };
+const DEFAULT_KWITANSI_SETTINGS = { orientation: "landscape", rowCount: 2, frameMargin: 26, watermark: { gapY: 9, opacity: 0.5 } };
 
 function KwitansiSettingView() {
   const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
@@ -1697,6 +1704,15 @@ function KwitansiSettingView() {
     <div style={{ padding: 28, maxWidth: 640 }}>
       <div style={{ ...card, padding: "20px 24px", marginBottom: 20 }}>
         <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 16 }}>Layout & Frame Kwitansi</div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ color: T.muted, fontSize: 12, display: "block", marginBottom: 6 }}>Orientasi Kertas (A4)</label>
+          <select style={inp} value={settings.orientation} onChange={e => setSettings(s => ({ ...s, orientation: e.target.value }))}>
+            <option value="landscape">Landscape - Kertas Mendatar (842 x 595)</option>
+            <option value="portrait">Portrait - Kertas Berdiri (595 x 842)</option>
+          </select>
+          <div style={{ color: T.muted, fontSize: 10.5, marginTop: 4 }}>Isi kwitansi tetap mendatar/horizontal; hanya proporsi ukuran kertas yang berubah.</div>
+        </div>
 
         <div style={{ marginBottom: 16 }}>
           <label style={{ color: T.muted, fontSize: 12, display: "block", marginBottom: 6 }}>Jumlah Lampiran per Halaman</label>
