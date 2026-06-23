@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { db, auth } from "./firebase";
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, increment } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, increment } from "firebase/firestore";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 
 // ─── MOCK DATA ───────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "3.9.0";
+const APP_VERSION = "4.0.0";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
@@ -86,7 +86,7 @@ function fmtPdf(n) {
   return fmt(n).replace(/\u00A0/g, " ");
 }
 
-async function generateKwitansiPDF(tx, car) {
+async function generateKwitansiPDF(tx, car, settings = {}) {
   await loadScript([
     "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js",
     "https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js",
@@ -148,7 +148,7 @@ async function generateKwitansiPDF(tx, car) {
     const colRight = PAGE_W - pad - 150; // kolom kanan (QR) mulai di sini
 
     // Frame kotak mengelilingi kwitansi, dengan jarak cukup jauh dari tepi kertas
-    const frameMargin = 26;
+    const frameMargin = settings.frameMargin ?? 26;
     const frameX = frameMargin, frameY = bottom + frameMargin;
     const frameW = PAGE_W - frameMargin * 2, frameH = rowH - frameMargin * 2;
     page.drawRectangle({
@@ -157,10 +157,20 @@ async function generateKwitansiPDF(tx, car) {
     });
 
     // Watermark: pola teks "ZAHRA MOBIL" horizontal berulang rapat, sangat pudar, menutupi PENUH area frame
-    const wmText = "ZAHRA MOBIL  ";
-    const wmFull = wmText.repeat(14);
-    for (let wy = frameY + 8; wy < frameY + frameH - 4; wy += 9) {
-      page.drawText(wmFull, { x: frameX + 6, y: wy, size: 6, font: fontBold, color: rgb(0.88, 0.84, 0.7), opacity: 0.5, maxWidth: frameW - 12 });
+    // Jumlah pengulangan dihitung presisi berdasarkan lebar font asli, supaya tidak pernah melebihi frame.
+    const wmSize = 6;
+    const wmGapY = settings.watermark?.gapY ?? 9;
+    const wmOpacity = settings.watermark?.opacity ?? 0.5;
+    const wmInnerPad = 6;
+    const wmUnit = "ZAHRA MOBIL  ";
+    const wmUnitWidth = fontBold.widthOfTextAtSize(wmUnit, wmSize);
+    const wmAvailWidth = frameW - wmInnerPad * 2;
+    const wmRepeatCount = Math.ceil(wmAvailWidth / wmUnitWidth) + 1;
+    const wmFull = wmUnit.repeat(wmRepeatCount);
+    const wmTop = frameY + frameH - wmInnerPad;
+    const wmBottom = frameY + wmInnerPad;
+    for (let wy = wmBottom; wy <= wmTop; wy += wmGapY) {
+      page.drawText(wmFull, { x: frameX + wmInnerPad, y: wy, size: wmSize, font: fontBold, color: rgb(0.88, 0.84, 0.7), opacity: wmOpacity, maxWidth: wmAvailWidth });
     }
 
     // Kolom kiri: logo + nama showroom + judul kwitansi
@@ -246,9 +256,12 @@ async function generateKwitansiPDF(tx, car) {
     page.drawText(label, { x: frameX + frameW - 14 - fontBold.widthOfTextAtSize(label, 7.5), y: frameY + 10, size: 7.5, font: fontBold, color: gold });
   };
 
-  const rowH = PAGE_H / 2;
-  drawRow(0, rowH, "LAMPIRAN 1 - KONSUMEN");
-  drawRow(rowH, rowH, "LAMPIRAN 2 - SHOWROOM");
+  const rowCount = settings.rowCount ?? 2;
+  const rowH = PAGE_H / rowCount;
+  const rowLabels = ["LAMPIRAN 1 - KONSUMEN", "LAMPIRAN 2 - SHOWROOM", "LAMPIRAN 3 - CADANGAN"];
+  for (let i = 0; i < rowCount; i++) {
+    drawRow(rowH * i, rowH, rowLabels[i] || `LAMPIRAN ${i + 1}`);
+  }
 
   // Garis putus-putus pemisah HORIZONTAL antar baris + tulisan gunting
   const drawCutLine = (yPos) => {
@@ -260,7 +273,9 @@ async function generateKwitansiPDF(tx, car) {
     }
     page.drawText("- - GUNTING DI SINI - -", { x: PAGE_W / 2 - 50, y: yPos - 8, size: 6, font: fontItalic, color: rgb(0.55, 0.55, 0.55) });
   };
-  drawCutLine(PAGE_H - rowH);
+  for (let i = 1; i < rowCount; i++) {
+    drawCutLine(PAGE_H - rowH * i);
+  }
 
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([pdfBytes], { type: "application/pdf" });
@@ -403,6 +418,7 @@ const NAV = [
   { key: "crm", icon: "🎯", label: "Sales CRM" },
   { key: "finance", icon: "💰", label: "Finance" },
   { key: "export", icon: "📦", label: "Export & Backup" },
+  { key: "settingkwitansi", icon: "🧾", label: "Setting Kwitansi" },
 ];
 
 function Sidebar({ active, setActive, onLogout }) {
@@ -1329,7 +1345,14 @@ function FinanceView({ transactions, setTransactions, cars }) {
                       <button onClick={async (e) => {
                         const btn = e.currentTarget;
                         btn.disabled = true; btn.textContent = "⏳...";
-                        try { await generateKwitansiPDF(tx, relatedCar); }
+                        try {
+                          let kwitansiSettings = DEFAULT_KWITANSI_SETTINGS;
+                          try {
+                            const settingsSnap = await getDoc(doc(db, "meta", "kwitansiSettings"));
+                            if (settingsSnap.exists()) kwitansiSettings = { ...DEFAULT_KWITANSI_SETTINGS, ...settingsSnap.data() };
+                          } catch (e) { /* pakai default kalau gagal load setting */ }
+                          await generateKwitansiPDF(tx, relatedCar, kwitansiSettings);
+                        }
                         catch (err) { alert("Gagal membuat kwitansi: " + err.message); }
                         finally { btn.disabled = false; btn.textContent = "🧾 Preview"; }
                       }} style={{ padding: "5px 10px", background: `${T.gold}22`, color: "#8a6d1f", border: `1px solid ${T.gold}66`, borderRadius: 4, fontSize: 11, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
@@ -1616,6 +1639,100 @@ function ExportView({ cars, orders, transactions }) {
   );
 }
 
+// ─── SETTING KWITANSI (atur layout, frame, watermark) ───────────────────────────
+const DEFAULT_KWITANSI_SETTINGS = { rowCount: 2, frameMargin: 26, watermark: { gapY: 9, opacity: 0.5 } };
+
+function KwitansiSettingView() {
+  const inp = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: 0, padding: "6px 8px", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.12)", color: T.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+  const [settings, setSettings] = useState(DEFAULT_KWITANSI_SETTINGS);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testCar, setTestCar] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "meta", "kwitansiSettings"));
+        if (snap.exists()) setSettings({ ...DEFAULT_KWITANSI_SETTINGS, ...snap.data() });
+      } catch (e) { /* pakai default kalau gagal load */ }
+      setLoaded(true);
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await setDoc(doc(db, "meta", "kwitansiSettings"), settings);
+      alert("Setting kwitansi tersimpan.");
+    } catch (e) {
+      alert("Gagal menyimpan setting: " + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePreviewTest = async () => {
+    const dummyTx = { id: "PREVIEWTEST", category: "Pemasukan", type: "DP", notes: "Contoh transaksi untuk preview setting", amount: 50000000, date: new Date().toISOString().split("T")[0], namaPenyetor: "Contoh Konsumen" };
+    const dummyCar = { brand: "Toyota", model: "Avanza 1.3 G MT", type: "MPV", noPolisi: "BL 1234 AB", noRangka: "MHXXXX1234567890", noMesin: "DK12345678", year: 2023, color: "Hitam Metalik", price: 180000000, images: [] };
+    try {
+      await generateKwitansiPDF(dummyTx, dummyCar, settings);
+    } catch (e) {
+      alert("Gagal membuat preview: " + e.message);
+    }
+  };
+
+  if (!loaded) return <div style={{ padding: 28, color: T.muted }}>Memuat setting...</div>;
+
+  const slider = (label, value, min, max, step, onChange, suffix = "") => (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+        <label style={{ color: T.muted, fontSize: 12 }}>{label}</label>
+        <span style={{ color: T.accent, fontSize: 12, fontWeight: 700 }}>{value}{suffix}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))} style={{ width: "100%" }} />
+    </div>
+  );
+
+  return (
+    <div style={{ padding: 28, maxWidth: 640 }}>
+      <div style={{ ...card, padding: "20px 24px", marginBottom: 20 }}>
+        <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 16 }}>Layout & Frame Kwitansi</div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ color: T.muted, fontSize: 12, display: "block", marginBottom: 6 }}>Jumlah Lampiran per Halaman</label>
+          <select style={inp} value={settings.rowCount} onChange={e => setSettings(s => ({ ...s, rowCount: Number(e.target.value) }))}>
+            <option value={1}>1 Lampiran (Besar, penuh halaman)</option>
+            <option value={2}>2 Lampiran (Konsumen + Showroom)</option>
+            <option value={3}>3 Lampiran (Konsumen + Showroom + Cadangan)</option>
+          </select>
+        </div>
+
+        {slider("Jarak Frame dari Tepi Kertas", settings.frameMargin, 10, 50, 1, v => setSettings(s => ({ ...s, frameMargin: v })), " px")}
+
+        <div style={{ color: T.gold, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginTop: 24, marginBottom: 16 }}>Watermark</div>
+        {slider("Jarak Antar Baris Watermark", settings.watermark.gapY, 6, 20, 1, v => setSettings(s => ({ ...s, watermark: { ...s.watermark, gapY: v } })), " px")}
+        {slider("Tingkat Transparansi (lebih kecil = lebih pudar)", settings.watermark.opacity, 0.1, 1, 0.05, v => setSettings(s => ({ ...s, watermark: { ...s.watermark, opacity: v } })))}
+
+        <div style={{ display: "flex", gap: 12, marginTop: 24, flexWrap: "wrap" }}>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "10px 20px", ...xpBtn(true), fontSize: 13, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Menyimpan..." : "💾 Simpan Setting"}
+          </button>
+          <button onClick={handlePreviewTest} style={{ padding: "10px 20px", ...xpBtn(false), fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            👁 Preview dengan Data Contoh
+          </button>
+          <button onClick={() => setSettings(DEFAULT_KWITANSI_SETTINGS)} style={{ padding: "10px 20px", ...xpBtn(false), fontSize: 13, cursor: "pointer" }}>
+            ↺ Kembalikan ke Default
+          </button>
+        </div>
+      </div>
+
+      <div style={{ ...card, padding: "16px 20px", color: T.muted, fontSize: 12, lineHeight: 1.6 }}>
+        💡 Setting ini berlaku untuk semua kwitansi yang dicetak setelah disimpan. Gunakan "Preview dengan Data Contoh" untuk melihat hasilnya tanpa perlu transaksi asli.
+      </div>
+    </div>
+  );
+}
+
 export default function ZahraMobilAdmin() {
   const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState(null);
@@ -1652,7 +1769,7 @@ export default function ZahraMobilAdmin() {
     return () => { unsubCars(); unsubOrders(); unsubTx(); unsubStorage(); };
   }, [user]);
 
-  const titles = { dashboard: "Dashboard Overview", inventaris: "Manajemen Inventaris", crm: "Sales CRM — Kanban Board", finance: "Modul Finance", export: "Export & Backup Data" };
+  const titles = { dashboard: "Dashboard Overview", inventaris: "Manajemen Inventaris", crm: "Sales CRM — Kanban Board", finance: "Modul Finance", export: "Export & Backup Data", settingkwitansi: "Setting Kwitansi" };
 
   if (!authChecked) {
     return (
@@ -1708,6 +1825,7 @@ export default function ZahraMobilAdmin() {
           {page === "crm" && <CRMView orders={orders} setOrders={setOrders} />}
           {page === "finance" && <FinanceView transactions={transactions} setTransactions={setTransactions} cars={cars} />}
           {page === "export" && <ExportView cars={cars} orders={orders} transactions={transactions} />}
+          {page === "settingkwitansi" && <KwitansiSettingView />}
         </main>
       </div>
     </div>
