@@ -18,7 +18,7 @@ function defaultInspection() {
   return out;
 }
 
-const APP_VERSION = "4.1.0";
+const APP_VERSION = "4.2.0";
 const fmt = (n) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 const fmtShort = (n) => n >= 1e9 ? `${(n / 1e9).toFixed(2)} M` : `${(n / 1e6).toFixed(0)} Jt`;
 
@@ -145,14 +145,9 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
   page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: rgb(0.98, 0.97, 0.94) });
 
   const drawRow = (offsetYTop, rowH, label) => {
-    const pad = 24 * SCALE;
     const top = PAGE_H - offsetYTop; // y absolut bagian atas baris ini
     const bottom = top - rowH;
     let y = top - 22;
-    const xLeft = pad;
-    const xRight = PAGE_W - pad;
-    const colMid = pad + 340 * SCALE; // kolom tengah (data) mulai di sini
-    const colRight = PAGE_W - pad - 150 * SCALE; // kolom kanan (QR) mulai di sini
 
     // Frame kotak mengelilingi kwitansi, dengan jarak cukup jauh dari tepi kertas
     const frameMargin = (settings.frameMargin ?? 26) * SCALE;
@@ -162,6 +157,16 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
       x: frameX, y: frameY, width: frameW, height: frameH,
       color: rgb(1, 1, 1), borderColor: rgb(0.55, 0.46, 0.22), borderWidth: 1.3,
     });
+
+    // Jarak isi konten dari GARIS FRAME (bukan dari tepi kertas) - supaya saat frameMargin diubah,
+    // konten tetap punya jarak aman dan tidak pernah menempel/tertimpa garis frame.
+    const innerPad = 18 * SCALE;
+    const pad = frameX + innerPad;
+    y = top - 22; // posisi y tidak terpengaruh perubahan ini
+    const xLeft = pad;
+    const xRight = frameX + frameW - innerPad;
+    const colMid = pad + 340 * SCALE; // kolom tengah (data) mulai di sini
+    const colRight = xRight - 150 * SCALE; // kolom kanan (QR) mulai di sini
 
     // Watermark: pola teks "ZAHRA MOBIL" horizontal berulang rapat, sangat pudar, menutupi PENUH area frame
     // Jumlah pengulangan dihitung presisi berdasarkan lebar font asli, supaya tidak pernah melebihi frame.
@@ -181,13 +186,17 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
     }
 
     // Kolom kiri: logo + nama showroom + judul kwitansi
+    let logoTextX = xLeft + 48 * SCALE; // posisi default kalau logo tidak ada
     if (logoImg) {
-      const logoDims = logoImg.scale(36 / logoImg.height);
-      page.drawImage(logoImg, { x: xLeft, y: y - 30, width: logoDims.width, height: 36 });
+      const logoH = 36;
+      const logoDims = logoImg.scale(logoH / logoImg.height);
+      page.drawImage(logoImg, { x: xLeft, y: y - 30, width: logoDims.width, height: logoH });
+      // Jarak teks dari logo dihitung dari LEBAR ASLI logo + jarak aman, supaya tidak pernah tertimpa meski logo lebar
+      logoTextX = xLeft + logoDims.width + 10 * SCALE;
     }
-    page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: xLeft + 48 * SCALE, y: y - 6, size: 13, font: fontBold, color: dark });
-    page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: xLeft + 48 * SCALE, y: y - 18, size: 6.2, font: fontRegular, color: muted, maxWidth: 280 * SCALE });
-    page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: xLeft + 48 * SCALE, y: y - 28, size: 6.2, font: fontRegular, color: muted });
+    page.drawText(SHOWROOM_INFO.nama.toUpperCase(), { x: logoTextX, y: y - 6, size: 13, font: fontBold, color: dark });
+    page.drawText(SHOWROOM_INFO.alamat.toUpperCase(), { x: logoTextX, y: y - 18, size: 6.2, font: fontRegular, color: muted, maxWidth: (xRight - logoTextX) });
+    page.drawText(`TELP/WA: ${SHOWROOM_INFO.telepon}`, { x: logoTextX, y: y - 28, size: 6.2, font: fontRegular, color: muted });
 
     let yL = y - 56;
     page.drawText("KWITANSI PEMBAYARAN", { x: xLeft, y: yL, size: 12, font: fontBold, color: dark });
@@ -201,11 +210,28 @@ async function generateKwitansiPDF(tx, car, settings = {}) {
     page.drawText(fmtPdf(tx.amount || 0), { x: xLeft, y: yL, size: 18, font: fontBold, color: gold });
     yL -= 22;
 
-    // Kotak terbilang ala kwitansi pasar: label "TERBILANG" di atas, teks italic di dalam kotak bergaris
+    // Kotak terbilang ala kwitansi pasar: arsir diagonal halus sebagai background, lalu garis batas, lalu teks
     const terbilangBoxW = 290 * SCALE, terbilangBoxH = 30;
     page.drawText("TERBILANG", { x: xLeft, y: yL, size: 6.5, font: fontBold, color: muted });
     yL -= 4;
     page.drawLine({ start: { x: xLeft, y: yL }, end: { x: xLeft + terbilangBoxW, y: yL }, thickness: 0.8, color: dark });
+
+    // Arsir diagonal halus - garis-garis pendek miring berulang menutupi seluruh kotak, sebagai pengaman visual.
+    // Setiap garis dihitung supaya titik awal & akhirnya tetap berada DI DALAM batas kotak (tidak meleber keluar).
+    const arsirTop = yL, arsirBottom = yL - terbilangBoxH;
+    const arsirColor = rgb(0.82, 0.82, 0.82);
+    const arsirGap = 5;
+    const arsirRight = xLeft + terbilangBoxW;
+    for (let ax = xLeft - terbilangBoxH; ax < arsirRight; ax += arsirGap) {
+      const x1 = Math.max(ax, xLeft);
+      const x2 = Math.min(ax + terbilangBoxH, arsirRight);
+      if (x2 <= x1) continue;
+      // y dihitung proporsional supaya garis tetap diagonal 45 derajat meski terpotong di tepi kotak
+      const y1 = arsirBottom + (x1 - ax);
+      const y2 = arsirBottom + (x2 - ax);
+      page.drawLine({ start: { x: x1, y: Math.min(y1, arsirTop) }, end: { x: x2, y: Math.min(y2, arsirTop) }, thickness: 0.4, color: arsirColor });
+    }
+
     const terbilangBody = `${terbilang(tx.amount || 0).toUpperCase()} RUPIAH`;
     page.drawText(terbilangBody, { x: xLeft + 4, y: yL - 11, size: 8, font: fontItalic, color: dark, maxWidth: terbilangBoxW - 8, lineHeight: 10 });
     yL -= terbilangBoxH;
@@ -1679,7 +1705,7 @@ function KwitansiSettingView() {
   };
 
   const handlePreviewTest = async () => {
-    const dummyTx = { id: "PREVIEWTEST", category: "Pemasukan", type: "DP", notes: "Contoh transaksi untuk preview setting", amount: 50000000, date: new Date().toISOString().split("T")[0], namaPenyetor: "Contoh Konsumen" };
+    const dummyTx = { id: "PREVIEWTEST", category: "Pemasukan", type: "DP", notes: "Contoh transaksi untuk preview", amount: 50000000, date: new Date().toISOString().split("T")[0], namaPenyetor: "Contoh Konsumen" };
     const dummyCar = { brand: "Toyota", model: "Avanza 1.3 G MT", type: "MPV", noPolisi: "BL 1234 AB", noRangka: "MHXXXX1234567890", noMesin: "DK12345678", year: 2023, color: "Hitam Metalik", price: 180000000, images: [] };
     try {
       await generateKwitansiPDF(dummyTx, dummyCar, settings);
